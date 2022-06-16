@@ -1,56 +1,58 @@
 library(mlegp)
-library(ggplot2)
+library(tidyverse)
 load("toJuho.Rdata")
+load("whole_stack.Rdata")
+load("metrics_matrix.Rdata")
+source("model_metrics.R")
 
-##### Fitting GP, predicting ######
+##### calculating model metrics via function model_metrics #####
 
-df <- as.data.frame(toJuho)
-View(df)
-colnames(df)[6] <- "likelihood"
-plot(df$likelihood)
-dim(df) # 750 x 6 
+model_metrics(site_no = 2, response = 1, n_knots = 25, n_test_points = 150) # example
 
-shuffled_df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
-plot(shuffled_df$likelihood, ylab = "likelihood")
+### on Thursday run a couple more for site 1, largest no_knots
+for (n in c(500, 600)) {
+  for (resp in c(1,2)) {
+    output <- model_metrics(site_no = 1, response = resp, n_knots = n, n_test_points = 150)
+    metrics_matrix[nrow(metrics_matrix)+1, ] <- c(1, resp, n, 150, output[[1]], output[[2]], output[[3]], output[[4]])
+  }
+}
 
-training_set <- shuffled_df[1:500,]
-test_set <- shuffled_df[501:nrow(shuffled_df), ]
-
-start_clock <- proc.time()
-
-GPmodel = mlegp(X = training_set[, -ncol(df), drop = FALSE], Z = training_set[, ncol(df), drop = FALSE], 
-                nugget = 0, nugget.known = 1, verbose = 0) #sets nugget to 0 --> no variance on training points? test verbose 1, 2
-
-stop_clock <- proc.time()
-time <- stop_clock - start_clock
-time[3] #384.934 seconds to fit the model
-
-start_clock <- proc.time()
-GP_pred = predict(GPmodel, shuffled_df[,-ncol(df)], se.fit = TRUE)
-stop_clock <- proc.time()
-time <- stop_clock - start_clock
-time[3] #906.408 seconds to predict the test set
-
-shuffled_df <- cbind(shuffled_df, GP_pred$fit, GP_pred$se.fit) #see how the predictions match with the training data, differs in test data
-
-colnames(shuffled_df)[7:ncol(shuffled_df)] <- c("pred", "se")
-
-test_set <- shuffled_df[501:nrow(shuffled_df), ]
-
-sqrt(mean((test_set$likelihood - test_set$pred)^2)) #156.3078 (RMSE root-mean-square-error)
-
-ggplot(test_set, mapping = aes(x = as.integer(row.names(test_set)), y = likelihood)) +
-  geom_point(color = "black") +
-  geom_point(aes(y = pred), color = "red") + 
-  geom_segment(mapping = aes(xend = as.integer(row.names(test_set)), yend = pred), alpha = 0.1) +
-  labs(x = "index") #+
-  #scale_colour_manual(values = c("black" = "black", "red" = "red"), labels = c("likelihood", "prediction"))
-
-
-### marginal plots of predicted likelihoods by different predictors
-par(mfrow = c(2,3))
-for (i in 1:5) {
-  print(i)
-  plot(shuffled_df[,i], shuffled_df$pred, ylab = "predicted likelihood", xlab = paste(colnames(shuffled_df)[i]))
+###for different sites with n_knots = 100
+for (site in 7:12) {
+  for (resp in c(1,2)) {
+    output <- model_metrics(site_no = site, response = resp, n_knots = 100, n_test_points = 150)
+    metrics_matrix[nrow(metrics_matrix)+1, ] <- c(site, resp, 100, 150, output[[1]], output[[2]], output[[3]], output[[4]])
+  }
 } 
 
+
+save(metrics_matrix, file = "metrics_matrix.Rdata")
+
+##### TESTING AREA #####
+
+
+plot11 <- metrics_matrix %>%
+  filter(knots == 100) %>%
+  ggplot(mapping = aes(x = time_model+time_pred, y=RMSqE, color=site, shape=response)) +
+  geom_point(size = 3) + labs(x = "time", title = "Site-to-site differences in prediction accuracies") +
+  guides(color = guide_legend(ncol=2))
+
+plot12 <- metrics_matrix %>%
+  filter(knots == 100) %>%
+  ggplot(mapping = aes(x = time_model+time_pred, y=MStdE, color=site, shape=response)) +
+  geom_point(size = 3) + labs(x = "time") +
+  guides(color = guide_legend(ncol=2))
+
+plot21 <- metrics_matrix%>%
+  filter(site == 1) %>%
+  ggplot(mapping = aes(x = time_model+time_pred, y=RMSqE, color=knots, shape=response)) +
+  geom_point(size = 3) + labs(x = "time", title = "Effects of increasing number of knots using site No.1")
+
+plot22 <- metrics_matrix %>%
+  filter(site == 1) %>%
+  ggplot(mapping = aes(x = time_model+time_pred, y=MStdE, color=knots, shape=response)) +
+  geom_point(size = 3) + labs(x = "time")
+
+
+(plot1 <- ggpubr::ggarrange(plot11, plot12, nrow = 2, common.legend = TRUE, legend = "right"))
+(plot2 <- ggpubr::ggarrange(plot21, plot22, nrow = 2, common.legend = TRUE, legend = "right"))
