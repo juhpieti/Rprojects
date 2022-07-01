@@ -7,6 +7,10 @@ load("priorfcn2Juho.Rdata")
 source("model_metrics.R")
 
 
+model_metrics(3,1,600,150,"mgcv","quantile",TRUE,1)
+
+model_metrics()
+
 df <- as.data.frame(SS.stack[[1]][[1]])
 colnames(df)[6] <- "likelihood"
 shuffled_df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
@@ -39,36 +43,31 @@ Z_01 = training_set_01[, ncol(df), drop = FALSE]
 
 #reps <- find_reps(X, Z)
 tic <- proc.time()
-gam_mod <- gam(likelihood ~ s(som_respiration_rate) + s(rdConst) + s(psnTOpt) + s(wueConst) + s(leafGrowth), data = training_set, knots = )
+gam_mod <- gam(likelihood ~ s(som_respiration_rate, bs = "tp", k = 10) + s(rdConst, bs = "tp", k = 10) + s(psnTOpt, bs = "tp", k = 10) + s(wueConst, bs = "tp", k = 10) + s(leafGrowth, bs = "tp", k = 10),
+               data = training_set, method = "REML")
+
+
+
+#gam_mod <- bam(likelihood ~ s(som_respiration_rate, bs = "tp") + s(rdConst, bs = "tp") + s(psnTOpt, bs = "tp") + s(wueConst, bs = "tp") + s(leafGrowth, bs = "tp"),
+#                data = training_set, method = "fREML", discrete = TRUE)
 toc <- proc.time()
 (toc-tic)[3]
 gam_mod
 summary(gam_mod)
 gam.check(gam_mod)
+k_det <- k.check(gam_mod)
 
+tic <- proc.time()
 gam_pred <- predict.gam(gam_mod, test_set[, -ncol(test_set)], se.fit = TRUE)
+toc <- proc.time()
+(toc-tic)[3]
 sqrt(mean((gam_pred$fit - test_set$likelihood)^2))
 mean(gam_pred$se.fit)
 
+plot(gam_pred$fit, test_set$likelihood)
+abline(a = 0, b = 1)
 
 
-homGPmodel <- mleHomGP(X = X, Z = Z, known = list(g = sqrt(.Machine$double.eps)), covtype = "Gaussian")#,
-#lower = rep(.Machine$double.eps, 5))
-homGPpred <- predict(homGPmodel, XX)
-toc <- proc.time()
-print((tic - toc)[3])
-
-tic <- proc.time()
-hetGPmodel <- mleHetGP(X = X, Z = Z, known = list(g = sqrt(.Machine$double.eps)), covtype = "Gaussian")#, settings = list(return.hom = TRUE))
-hetGPpred <- predict(hetGPmodel, XX)
-toc <- proc.time()
-print((tic - toc)[3])
-
-
-homGPpred <- predict(homGPmodel, XX)
-hetGPpred <- predict(hetGPmodel, XX)
-
-homGPpred <- predict(hetGPmodel$modHom, XX)
 
 
 test_set_mod <- test_set
