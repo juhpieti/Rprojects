@@ -11,9 +11,18 @@ mod <- model_metrics(n_knots = 50)
 
 mod <- model_metrics(site_no = 1, response = 1, n_knots = 25, n_test_points = 150, predictor_type = "quantile") # example
 
+model_metrics(1,1,50,150,"mlegp","normal",TRUE,sqrt(.Machine$double.eps),shuffled_df)
+model_metrics(1,1,50,150,"mlegp","normal",FALSE,sqrt(.Machine$double.eps),shuffled_df)
+
 df <- as.data.frame(SS.stack[[1]][[1]])
 colnames(df)[6] <- "likelihood"
 df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
+
+model_metrics(1,1,50,150,"mlegp","normal",TRUE,sqrt(.Machine$double.eps),shuffled_df)
+model_metrics(1,1,50,150,"mlegp","normal",TRUE,0,shuffled_df)
+model_metrics(site_no = 1, response = 1, n_knots = 50, n_test_points = 150, package = "mlegp", predictor_type = "normal",
+              nugget_known = TRUE, nugget = 0.1, data = shuffled_df)
+
 
 ### testing if there's difference between using normal values for predictors or quantile values
 rmse_normal <- rep(0, 10)
@@ -95,3 +104,66 @@ plot22 <- metrics_matrix %>%
 (plot2 <- ggpubr::ggarrange(plot21, plot22, nrow = 2, common.legend = TRUE, legend = "right"))
 
 
+rep <- 25
+
+df_metrics <- data.frame(RMSqE = 1, MStdE = 1, time = 0.1, nan_var = 0.5, nugget = "est")
+df_metrics <- df_metrics[-1, ]
+df_metrics$nugget <- as.factor(df_metrics$nugget)
+levels(df_metrics$nugget) <- c("eps", "0.1", "0.001", "est")
+
+for (i in 1:rep) {
+  df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
+  metrics_eps <- model_metrics(site_no = 1, response = 1, n_knots = 50, n_test_points = 150, package = "mlegp",
+                               predictor_type = "normal", nugget_known = TRUE, nugget = sqrt(.Machine$double.eps), data = df)
+  metrics_01 <- model_metrics(site_no = 1, response = 1, n_knots = 50, n_test_points = 150, package = "mlegp",
+                              predictor_type = "normal", nugget_known = TRUE, nugget = 0.1, data = df)
+  metrics_0001 <- model_metrics(site_no = 1, response = 1, n_knots = 50, n_test_points = 150, package = "mlegp",
+                                predictor_type = "normal", nugget_known = TRUE, nugget = 0.001, data = df)
+  metrics_est <- model_metrics(site_no = 1, response = 1, n_knots = 50, n_test_points = 150, package = "mlegp",
+                               predictor_type = "normal", nugget_known = FALSE, data = df)
+  
+  
+  df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_eps[[3]], metrics_eps[[4]], metrics_eps[[1]]+metrics_eps[[2]],metrics_eps[[5]], "eps")
+  df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_01[[3]], metrics_01[[4]], metrics_01[[1]]+metrics_01[[2]],metrics_01[[5]], "0.1")
+  df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_0001[[3]], metrics_0001[[4]], metrics_0001[[1]]+metrics_0001[[2]],metrics_0001[[5]], "0.001")
+  df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_est[[3]], metrics_est[[4]], metrics_est[[1]]+metrics_est[[2]],metrics_est[[5]], "est")
+  
+  
+}
+for (i in 1:4) {
+  df_metrics[,i] <- as.numeric(df_metrics[,i])
+}
+
+df_metrics %>%
+  group_by(nugget) %>%
+  summarise(RMSqE = mean(RMSqE),
+            MStdE = mean(MStdE, na.rm = TRUE),
+            time = mean(time),
+            'NaN%' = mean(nan_var)) %>% as.data.frame()
+
+
+rmse_normal <- rep(0, 100)
+rmse_quantile <- rep(0,100)
+mstde_normal <- rep(0,100)
+mstde_quantile <- rep(0,100)
+time_normal <- rep(0,100)
+time_quantile <- rep(0,100)
+
+for (i in 1:100) {
+  df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
+  metrics_normal <- model_metrics(site_no = 1, response = 1, n_knots = 50, n_test_points = 150,
+                                  package = "mlegp", predictor_type = "normal", data = df)
+  metrics_quantile <- model_metrics(site_no = 1, response = 1, n_knots = 50, n_test_points = 150,
+                                    package = "mlegp", predictor_type = "quantile", data = df)
+  rmse_normal[i] <- metrics_normal[[3]]
+  rmse_quantile[i] <- metrics_quantile[[3]]
+  mstde_normal[i] <- metrics_normal[[4]]
+  mstde_quantile[i] <- metrics_quantile[[4]]
+  time_normal[i] <- metrics_normal[[1]] + metrics_normal[[2]]
+  time_quantile[i] <- metrics_quantile[[1]] + metrics_quantile[[2]]
+}
+
+df_metrics <- data.frame(rmse_normal = rmse_normal, rmse_quantile = rmse_quantile, mstde_normal = mstde_normal,
+                         mstde_quantile = mstde_quantile, time_normal = time_normal, time_quantile = time_quantile)
+
+model_metrics(1,1,50,150,"mlegp","normal")
