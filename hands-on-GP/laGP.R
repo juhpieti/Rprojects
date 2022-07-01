@@ -11,13 +11,22 @@ deleteGPsep(laGPmodel_01)
 
 shuffled_df <- model_metrics(1, 1, 100, 150, "mlegp")
 
+model_metrics(1,1,600,150,"laGP","quantile",TRUE,sqrt(.Machine$double.eps),shuffled_df)
+model_metrics(1,1,600,150,"laGP","quantile",TRUE,0.1,shuffled_df)
+model_metrics(1,1,600,150,"laGP","quantile",TRUE,0.01,shuffled_df)
+model_metrics(1,1,100,150,"mlegp","quantile",TRUE,0.001,shuffled_df)
+model_metrics(1,1,300,150,"laGP","quantile",FALSE,0.0001,shuffled_df)
+
+
+
+
 mod <- model_metrics(n_knots = 600, package = "laGP")
 
 for (i in 1:10) {
   model_metrics(site_no = 1, response = 1, n_knots = 600, n_test_points = 150, package = "laGP", predictor_type = "quantile")
 }
 
-model_metrics(site_no = 1, response = 1, n_knots = 600, n_test_points = 150, package = "laGP", predictor_type = "quantile")
+model_metrics(site_no = 1, response = 1, n_knots = 200, n_test_points = 150, package = "laGP", predictor_type = "quantile")
 
 df <- as.data.frame(SS.stack[[1]][[1]])
 colnames(df)[6] <- "likelihood"
@@ -31,12 +40,10 @@ shuffled_df_01$wueConst <- sapply(shuffled_df_01$wueConst, function(x) {eval(pri
 shuffled_df_01$leafGrowth <- sapply(shuffled_df_01$leafGrowth, function(x) {eval(prior.fn.all$pprior[[37]], list(q=x))})
 
 training_set <- shuffled_df[(151:250), ]
-training_set <- shuffled_df[1:100, ] ######
 training_set_01 <- shuffled_df_01[(151:250), ]
 
 
 test_set <- shuffled_df[1:150, ]
-test_set <- shuffled_df[1:750, ] #####
 test_set_01 <- shuffled_df_01[1:150, ]
 
 X = training_set[, -ncol(df), drop = FALSE]
@@ -46,17 +53,18 @@ Z = training_set[, ncol(df), drop = TRUE]
 Z_01 = training_set_01[, ncol(df), drop = TRUE]
 
 
-d <- darg(list(mle = TRUE, min = 0), X)
+d <- darg(list(mle = TRUE, min = sqrt(.Machine$double.eps)), X)
+#d <- darg(list(mle = TRUE), X)
 d_01 <- darg(list(mle = TRUE, min = 0), X_01)
 
 
 
-#d <- darg(list(mle=FALSE), X)
-g <- garg(list(mle=FALSE), Z) #mle=FALSE = no estimation for nugget term, just set to 0
+
+g <- garg(list(mle=FALSE, min = sqrt(.Machine$double.eps)), Z) #mle=FALSE = no estimation for nugget term, just set to 0
 g_01 <- garg(list(mle=FALSE), Z_01) 
 
 
-laGPmodel <- newGPsep(X = X, Z = Z, d = rep(d$start, 5), g = 0, dK = TRUE)
+laGPmodel <- newGPsep(X = X, Z = Z, d = rep(d$start, 5), g = 0.1, dK = TRUE)
 laGPmodel_01 <- newGPsep(X = X_01, Z = Z_01, d = rep(d_01$start, 5), g = 0, dK = TRUE)
 
 #laGPmodel_01 <- newGPsep(X = X_01, Z = Z_01, d = c(1/1.201387381, 1/0.002795255, 1/5.813077585, 1/32.433430802, 1/4.678862480), g = 0, dK = TRUE)
@@ -70,6 +78,7 @@ laGPmodel_01 <- newGPsep(X = X_01, Z = Z_01, d = rep(d_01$start, 5), g = 0, dK =
 
 #mleGPsep(laGPmodel, param="d", tmin=c(d$min, 0), tmax=c(d$max, 0), verb = 1)
 mleGPsep(laGPmodel, param="d", tmin=d$min, tmax=d$max, verb = 1)
+#mleGPsep(laGPmodel, param="both", tmin=c(d$min, sqrt(.Machine$double.eps)), tmax = c(d$max, g$max), verb = 1)
 
 mleGPsep(laGPmodel_01, param="d", tmin = d_01$min, tmax = d_01$max, verb = 1)
 
@@ -135,6 +144,47 @@ for (n in c(100, 200, 300, 400, 500, 600)) {
   }
 }
 
+rep <- 50
+
+df_metrics <- data.frame(RMSqE = 1, MStdE = 1, time = 0.1, nan_var = 0.5, nugget = "est")
+df_metrics <- df_metrics[-1, ]
+df_metrics$nugget <- as.factor(df_metrics$nugget)
+levels(df_metrics$nugget) <- c("eps", "0.1", "0.001", "est")
+
+for (i in 1:rep) {
+  df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
+  metrics_eps <- model_metrics(site_no = 1, response = 1, n_knots = 300, n_test_points = 150, package = "laGP",
+                                  predictor_type = "normal", nugget_known = TRUE, nugget = sqrt(.Machine$double.eps), data = df)
+  metrics_01 <- model_metrics(site_no = 1, response = 1, n_knots = 300, n_test_points = 150, package = "laGP",
+                               predictor_type = "normal", nugget_known = TRUE, nugget = 0.1, data = df)
+  metrics_0001 <- model_metrics(site_no = 1, response = 1, n_knots = 300, n_test_points = 150, package = "laGP",
+                              predictor_type = "normal", nugget_known = TRUE, nugget = 0.001, data = df)
+  metrics_est <- model_metrics(site_no = 1, response = 1, n_knots = 300, n_test_points = 150, package = "laGP",
+                               predictor_type = "normal", nugget_known = FALSE, data = df)
+  
+
+df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_eps[[3]], metrics_eps[[4]], metrics_eps[[1]]+metrics_eps[[2]],metrics_eps[[5]], "eps")
+df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_01[[3]], metrics_01[[4]], metrics_01[[1]]+metrics_01[[2]],metrics_01[[5]], "0.1")
+df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_0001[[3]], metrics_0001[[4]], metrics_0001[[1]]+metrics_0001[[2]],metrics_0001[[5]], "0.001")
+df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_est[[3]], metrics_est[[4]], metrics_est[[1]]+metrics_est[[2]],metrics_est[[5]], "est")
+
+
+}
+for (i in 1:4) {
+  df_metrics[,i] <- as.numeric(df_metrics[,i])
+}
+
+df_metrics %>%
+  group_by(nugget) %>%
+  summarise(RMSqE = mean(RMSqE),
+            MStdE = mean(MStdE, na.rm = TRUE),
+            time = mean(time),
+            'NaN%' = mean(nan_var)) %>% as.data.frame()
+  
+
+metrics()
+
+
 ### testing if there's difference between using g = 0, g = .Machine$double.eps
 rmse_normal <- rep(0, 100)
 rmse_quantile <- rep(0,100)
@@ -145,10 +195,10 @@ time_quantile <- rep(0,100)
 
 for (i in 1:100) {
   df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
-  metrics_normal <- model_metrics(site_no = 1, response = 1, n_knots = 300, n_test_points = 150,
-                                  package = "laGP", predictor_type = "normal", data = df)
-  metrics_quantile <- model_metrics(site_no = 1, response = 1, n_knots = 300, n_test_points = 150,
-                                  package = "laGP", predictor_type = "quantile", data = df)
+  metrics_normal <- model_metrics(site_no = 1, response = 1, n_knots = 100, n_test_points = 150,
+                                  package = "hetGP", predictor_type = "normal", data = df)
+  metrics_quantile <- model_metrics(site_no = 1, response = 1, n_knots = 100, n_test_points = 150,
+                                  package = "hetGP", predictor_type = "quantile", data = df)
   rmse_normal[i] <- metrics_normal[[3]]
   rmse_quantile[i] <- metrics_quantile[[3]]
   mstde_normal[i] <- metrics_normal[[4]]
@@ -159,6 +209,10 @@ for (i in 1:100) {
 
 df_metrics <- data.frame(rmse_normal = rmse_normal, rmse_quantile = rmse_quantile, mstde_normal = mstde_normal,
                          mstde_quantile = mstde_quantile, time_normal = time_normal, time_quantile = time_quantile)
+for (i in 1:100) {
+  df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
+  model_metrics(1,1,300,150,"laGP","normal",df)
+}
 
 save(metrics_matrix_new, file = "metrics_matrix_new.Rdata")
 save(metrics_matrix, file = "metrics_matrix.Rdata")
