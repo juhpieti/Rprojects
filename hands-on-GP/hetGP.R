@@ -8,9 +8,15 @@ source("model_metrics.R")
 
 lol <- model_metrics(1,1,100,150,"mlegp","normal")
 
-model_metrics(1,1,100,150,"mlegp","normal",data = shuffled_df)
-model_metrics(1,1,100,150,"laGP","normal",data = shuffled_df)
-model_metrics(1,1,100,150,"hetGP","normal",data = shuffled_df)
+model_metrics(1,1,300,150,"hetGP","normal",TRUE,sqrt(.Machine$double.eps),shuffled_df)
+model_metrics(1,1,300,150,"hetGP","normal",TRUE,0.1,shuffled_df)
+model_metrics(1,1,300,150,"hetGP","normal",TRUE,0.01,shuffled_df)
+model_metrics(1,1,300,150,"hetGP","normal",TRUE,0.001,shuffled_df)
+model_metrics(1,1,300,150,"hetGP","normal",FALSE,0.1,shuffled_df)
+
+
+
+
 
 df <- as.data.frame(SS.stack[[1]][[1]])
 colnames(df)[6] <- "likelihood"
@@ -47,6 +53,7 @@ Z_01 = training_set_01[, ncol(df), drop = TRUE]
 tic <- proc.time()
 homGPmodel <- mleHomGP(X = X, Z = Z, known = list(g = sqrt(.Machine$double.eps)), covtype = "Gaussian")#,
                        #lower = rep(.Machine$double.eps, 5))
+homGPmodel <- mleHomGP(X = X, Z = Z, covtype = "Gaussian")
 homGPpred <- predict(homGPmodel, XX)
 toc <- proc.time()
 print((tic - toc)[3])
@@ -65,8 +72,8 @@ homGPpred <- predict(hetGPmodel$modHom, XX)
 
 
 test_set_mod <- test_set
-test_set_mod$pred <- hetGPpred$mean
-test_set_mod$se <- sqrt(hetGPpred$sd2 + hetGPpred$nugs)
+test_set_mod$pred <- homGPpred$mean
+test_set_mod$se <- sqrt(homGPpred$sd2 + homGPpred$nugs)
 
 sqrt(mean((test_set_mod$likelihood - test_set_mod$pred)^2)) #1135
 mean(test_set_mod$se) #1194
@@ -191,6 +198,43 @@ metrics_matrix %>%
   summarise(time = (sum(time_pred) + sum(time_model)) / n() ,
             accuracy = (sum(RMSqE) + sum(MStdE)) / n())
 
+
+rep <- 50
+
+df_metrics <- data.frame(RMSqE = 1, MStdE = 1, time = 0.1, nan_var = 0.5, nugget = "est")
+df_metrics <- df_metrics[-1, ]
+df_metrics$nugget <- as.factor(df_metrics$nugget)
+levels(df_metrics$nugget) <- c("eps", "0.1", "0.001", "est")
+
+for (i in 1:rep) {
+  df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
+  metrics_eps <- model_metrics(site_no = 1, response = 1, n_knots = 300, n_test_points = 150, package = "hetGP",
+                               predictor_type = "normal", nugget_known = TRUE, nugget = sqrt(.Machine$double.eps), data = df)
+  metrics_01 <- model_metrics(site_no = 1, response = 1, n_knots = 300, n_test_points = 150, package = "hetGP",
+                              predictor_type = "normal", nugget_known = TRUE, nugget = 0.1, data = df)
+  metrics_0001 <- model_metrics(site_no = 1, response = 1, n_knots = 300, n_test_points = 150, package = "hetGP",
+                                predictor_type = "normal", nugget_known = TRUE, nugget = 0.001, data = df)
+  metrics_est <- model_metrics(site_no = 1, response = 1, n_knots = 300, n_test_points = 150, package = "hetGP",
+                               predictor_type = "normal", nugget_known = FALSE, data = df)
+  
+  
+  df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_eps[[3]], metrics_eps[[4]], metrics_eps[[1]]+metrics_eps[[2]],metrics_eps[[5]], "eps")
+  df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_01[[3]], metrics_01[[4]], metrics_01[[1]]+metrics_01[[2]],metrics_01[[5]], "0.1")
+  df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_0001[[3]], metrics_0001[[4]], metrics_0001[[1]]+metrics_0001[[2]],metrics_0001[[5]], "0.001")
+  df_metrics[nrow(df_metrics) + 1 , ] <- c(metrics_est[[3]], metrics_est[[4]], metrics_est[[1]]+metrics_est[[2]],metrics_est[[5]], "est")
+  
+  
+}
+for (i in 1:4) {
+  df_metrics[,i] <- as.numeric(df_metrics[,i])
+}
+
+df_metrics %>%
+  group_by(nugget) %>%
+  summarise(RMSqE = mean(RMSqE),
+            MStdE = mean(MStdE, na.rm = TRUE),
+            time = mean(time),
+            'NaN%' = mean(nan_var)) %>% as.data.frame()
 ##### EXAMPLES #####
 
 
