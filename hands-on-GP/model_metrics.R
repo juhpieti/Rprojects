@@ -1,13 +1,15 @@
 library(mlegp)
 library(laGP)
 library(hetGP)
+library(mgcv)
 library(tidyverse)
-#load("toJuho.Rdata")
 load("whole_stack.Rdata")
 
 ##### Fitting GP & predicting ######
 
-model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 150, package = "mlegp", predictor_type = "normal", data = NULL) {
+model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 150, package = "mlegp",
+                          predictor_type = "normal", nugget_known = TRUE, nugget = sqrt(.Machine$double.eps), gam_type = "gam", data = NULL) {
+  
   df <- as.data.frame(SS.stack[[site_no]][[response]])
   colnames(df)[6] <- "likelihood"
   shuffled_df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
@@ -26,6 +28,8 @@ model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_point
   }
   
 ### set the training & testing sets ##  
+  #test_set <- shuffled_df[(n_knots-50):((n_knots-50)+n_test_points), ] #to test how nugget effects when training points also in test set
+  #training_set <- shuffled_df[1:n_knots, ]
   test_set <- shuffled_df[(1:n_test_points), ]
   training_set <- shuffled_df[(n_test_points + 1):(n_test_points + n_knots), ]
   X = training_set[, -ncol(df), drop = FALSE]
@@ -40,22 +44,68 @@ model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_point
 ### build the model ###  
   tic <- proc.time()
   if (package == "mlegp") {
-    GPmodel <- mlegp(X = X, Z = Z, nugget = 0, nugget.known = 1, verbose = 0)
+    if (nugget_known) {
+      model <- mlegp(X = X, Z = Z, nugget = nugget, nugget.known = 1, verbose = 0)
+    } else {
+        model <- mlegp(X = X, Z = Z, nugget.known = 0, verbose = 0)
+    }
     #print(GPmodel$beta)
   } else if (package == "laGP") {
     d <- darg(list(mle=TRUE, min = sqrt(.Machine$double.eps)), X)
-    g <- garg(list(mle=FALSE, start = sqrt(.Machine$double.eps)), Z) #mle=FALSE = no estimation for nugget term, just set to 0
-    GPmodel <- newGPsep(X = X, Z = Z, d = rep(d$start, 5), g = g$start, dK = TRUE) #g = 0 or .Machine$double ? g = 0 causes Cholesky decomp error?
-    GPmle <- mleGPsep(GPmodel, param="d", tmin=d$min, tmax=d$max)  ###d$max*constant, multiplier to make the upper limit larger so that mle:s dont get stuck to limit? 
-    
+    g <- garg(list(mle=ifelse(nugget_known, FALSE, TRUE)), Z) #mle=FALSE = no estimation for nugget term, just set to 0
+    model <- newGPsep(X = X, Z = Z, d = rep(d$start, 5), g = ifelse(nugget_known, nugget, g$start), dK = TRUE) #g = 0 or .Machine$double ? g = 0 causes Cholesky decomp error?
+    if (nugget_known) {
+    mle <- mleGPsep(model, param="d", tmin=d$min, tmax=d$max, verb = 0)  ###d$max*constant, multiplier to make the upper limit larger so that mle:s dont get stuck to limit? 
+    } else {
+    mle <- mleGPsep(model, param="both", tmin=c(d$min, g$min), tmax = c(d$max, g$max), verb = 0)
+    }
     ### the following to look at the parameters
     #d <- darg(list(mle = TRUE), X) #without setting limits manually
     #print(d)
     #mleGPsep(GPmodel, param = "d", tmin = d$min, tmax = d$max, verb = 1)
     
   } else if (package == "hetGP") {
-    GPmodel <- mleHomGP(X = X, Z = Z, known = list(g = sqrt(.Machine$double.eps)))
+    if (nugget_known) {
+    model <- mleHomGP(X = X, Z = Z, known = list(g = nugget), covtype = "Gaussian")
+    } else {
+      model <- mleHomGP(X = X, Z = Z, covtype = "Gaussian")
+    }
     #print(GPmodel$theta)
+  } else if (package == "mgcv") {
+    k <- rep(10, 5)
+    if (gam_type == "gam") {
+      model <- gam(likelihood ~ s(som_respiration_rate, bs = "cr", k = k[1]) + s(rdConst, bs = "cr", k = k[2]) + s(psnTOpt, bs = "cr", k = k[3]) + s(wueConst, bs = "cr", k = k[4]) + s(leafGrowth, bs = "cr", k = k[5]),
+                  data = training_set, method = "REML")
+      kcheck <- k.check(model)
+      if (min(kcheck[,4]) < 0.01) { ### if k is too low for some predictor, we will double it
+        k <- k + k*(kcheck[,4] < 0.01)
+        model <- gam(likelihood ~ s(som_respiration_rate, bs = "cr", k = k[1]) + s(rdConst, bs = "cr", k = k[2]) + s(psnTOpt, bs = "cr", k = k[3]) + s(wueConst, bs = "cr", k = k[4]) + s(leafGrowth, bs = "cr", k = k[5]),
+                     data = training_set, method = "REML")
+        kcheck1 <- kcheck ### comment this off!!!
+        kcheck <- k.check(model)
+      }
+
+    } else {
+        model <- bam(likelihood ~ s(som_respiration_rate, bs = "cr", k = k[1]) + s(rdConst, bs = "cr", k = k[2]) + s(psnTOpt, bs = "cr", k = k[3]) + s(wueConst, bs = "cr", k = k[4]) + s(leafGrowth, bs = "cr", k = k[5]),
+                    data = training_set, method = "fREML")
+        kcheck <- k.check(model)
+        if (min(kcheck[,4]) < 0.01) {
+          k <- k + k*(kcheck[,4] < 0.01)
+          model <- bam(likelihood ~ s(som_respiration_rate, bs = "cr", k = k[1]) + s(rdConst, bs = "cr", k = k[2]) + s(psnTOpt, bs = "cr", k = k[3]) + s(wueConst, bs = "cr", k = k[4]) + s(leafGrowth, bs = "cr", k = k[5]),
+                       data = training_set, method = "fREML")
+          kcheck1 <- kcheck
+          kcheck <- k.check(model)
+        }
+      
+    }
+    # model <- bam() #big data alternative, method = "qREML", bs = "cr" or "ps"
+    # print(kcheck)
+    # print(gam.check(model))
+    # plot.gam(model, pages = 1)
+    # if (min(kcheck[,4]) < 0.01) {
+    #   print(kcheck1)
+    #   print(kcheck)
+    # }
   }
   toc <- proc.time()
   time_model <- as.numeric((toc - tic)[3])
@@ -64,48 +114,57 @@ model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_point
   tic <- proc.time()
   
   if (package == "mlegp") {
-    GP_pred <- predict.gp(GPmodel, XX, se.fit = TRUE)
+    mod_pred <- predict.gp(model, XX, se.fit = TRUE)
   } else if (package == "laGP") {
-    GP_pred <- predGPsep(GPmodel, XX, lite = TRUE, nonug = FALSE)
-    deleteGPsep(GPmodel)
+    mod_pred <- predGPsep(model, XX, lite = TRUE, nonug = FALSE)
+    deleteGPsep(model)
   } else if (package == "hetGP") {
-    GP_pred <- predict(GPmodel, XX)
+    mod_pred <- predict(model, XX)
+  } else if (package == "mgcv") {
+    mod_pred <- predict.gam(model, test_set[, -ncol(test_set)], se.fit = TRUE)
   }
   
   toc <- proc.time()
   time_pred <- as.numeric((toc - tic)[3])
   
-  if (package == "mlegp") {
-    test_set <- cbind(test_set, GP_pred$fit, GP_pred$se.fit)
+  if (package %in% c("mlegp", "mgcv")) {
+    test_set <- cbind(test_set, mod_pred$fit, mod_pred$se.fit)
     colnames(test_set)[7:ncol(test_set)] <- c("pred", "se")
   } else if (package == "laGP") {
-    test_set$pred <- GP_pred$mean
-    test_set$se <- sqrt(GP_pred$s2)
+    test_set$pred <- mod_pred$mean
+    test_set$se <- sqrt(mod_pred$s2)
     
     #print(mean(sqrt(abs(GP_pred$s2))))
     #print(sqrt(mean((test_set$likelihood - test_set$pred)^2)))
     #print(sum(is.nan(sqrt(GP_pred$s2)))) #why is this producing this much NaN's as GP_pred$s2 aren't NaN?
     #View(cbind(variance = absGP_pred$s2, se = sqrt(GP_pred$s2))) ###########
   } else if (package == "hetGP") {
-    test_set$pred <- GP_pred$mean
-    test_set$se <- sqrt(GP_pred$sd2 + GP_pred$nugs)
+    test_set$pred <- mod_pred$mean
+    test_set$se <- sqrt(mod_pred$sd2 + mod_pred$nugs)
   }
   
 ### calculate metrics ###  
+  if (sum(is.nan(test_set$se)) > 0) {
+    nas <- TRUE
+  } else {
+    nas <- FALSE
+  }
   rmse <- sqrt(mean((test_set$likelihood - test_set$pred)^2, na.rm = TRUE)) 
   mean_std_err <- mean((test_set$se), na.rm = TRUE)
   
   metrics <- c("model time" = as.numeric(time_model), "prediction time" = as.numeric(time_pred), "rooted mean square error" = as.numeric(rmse),
-               "mean standard error" = as.numeric(mean_std_err))
+               "mean standard error" = as.numeric(mean_std_err), "Nan_SEs" = nas, "sign_p" = ifelse(package == "mgcv", min(kcheck[,4]) < 0.01, 0))
 
   plot(test_set$likelihood, test_set$pred, xlab = "observed", ylab = "predicted", #ylim = c(6000, 13000)
        main = paste0("knots: ", n_knots,", package: ", package, ", pred_type: ", predictor_type))
   abline(0, 1)
   
-
-  #print(metrics)
-  #print(GPmodel$beta)
+  
   return(metrics)
+  #print(metrics)
+  #return(kcheck)
+  #print(GPmodel$beta)
+  #return(test_set)
   #return(GPmodel)
 }
 
