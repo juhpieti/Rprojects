@@ -8,30 +8,36 @@ load("whole_stack.Rdata")
 ##### Fitting GP & predicting ######
 
 model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 150, package = "mlegp",
-                          predictor_type = "normal", nugget_known = TRUE, nugget = sqrt(.Machine$double.eps), gam_type = "gam", data = NULL) {
+                          predictor_type = "original", nugget_known = FALSE, nugget = 0.001, gam_type = "bam", data = NULL) {
   
   df <- as.data.frame(SS.stack[[site_no]][[response]])
   colnames(df)[6] <- "likelihood"
-  shuffled_df <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
+  df_shuffled <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
   
   if (!is.null(data)) { # if data is given beforehand, we shall use it instead of shuffled
-    shuffled_df <- data
+    df_shuffled <- data
   }
   
 ### prepare quantiles ###  
-  if (predictor_type == "quantile") {
-    shuffled_df$som_respiration_rate <- sapply(shuffled_df$som_respiration_rate, function(x) {eval(prior.fn.all$pprior[[7]], list(q=x))})
-    shuffled_df$rdConst <- sapply(shuffled_df$rdConst, function(x) {eval(prior.fn.all$pprior[[10]], list(q=x))})
-    shuffled_df$psnTOpt <- sapply(shuffled_df$psnTOpt, function(x) {eval(prior.fn.all$pprior[[25]], list(q=x))})
-    shuffled_df$wueConst <- sapply(shuffled_df$wueConst, function(x) {eval(prior.fn.all$pprior[[36]], list(q=x))})
-    shuffled_df$leafGrowth <- sapply(shuffled_df$leafGrowth, function(x) {eval(prior.fn.all$pprior[[37]], list(q=x))})
+  if (predictor_type %in% c("quantile", "normal")) {
+    df_shuffled$som_respiration_rate <- sapply(df_shuffled$som_respiration_rate, function(x) {eval(prior.fn.all$pprior[[7]], list(q=x))})
+    df_shuffled$rdConst <- sapply(df_shuffled$rdConst, function(x) {eval(prior.fn.all$pprior[[10]], list(q=x))})
+    df_shuffled$psnTOpt <- sapply(df_shuffled$psnTOpt, function(x) {eval(prior.fn.all$pprior[[25]], list(q=x))})
+    df_shuffled$wueConst <- sapply(df_shuffled$wueConst, function(x) {eval(prior.fn.all$pprior[[36]], list(q=x))})
+    df_shuffled$leafGrowth <- sapply(df_shuffled$leafGrowth, function(x) {eval(prior.fn.all$pprior[[37]], list(q=x))})
+
+  }
+  
+  if (predictor_type == "normal") {
+    std_norm_values <- apply(df_shuffled[, -ncol(df_shuffled)], MARGIN = c(1,2), function(x) {qnorm(p = x)})
+    df_shuffled[, -ncol(df_shuffled)] <- std_norm_values
   }
   
 ### set the training & testing sets ##  
-  #test_set <- shuffled_df[(n_knots-50):((n_knots-50)+n_test_points), ] #to test how nugget effects when training points also in test set
-  #training_set <- shuffled_df[1:n_knots, ]
-  test_set <- shuffled_df[(1:n_test_points), ]
-  training_set <- shuffled_df[(n_test_points + 1):(n_test_points + n_knots), ]
+  #test_set <- df_shuffled[(n_knots-50):((n_knots-50)+n_test_points), ] #to test how nugget effects when training points also in test set
+  #training_set <- df_shuffled[1:n_knots, ]
+  test_set <- df_shuffled[(1:n_test_points), ]
+  training_set <- df_shuffled[(n_test_points + 1):(n_test_points + n_knots), ]
   X = training_set[, -ncol(df), drop = FALSE]
   Z = training_set[, ncol(df), drop = ifelse(package %in% c("laGP", "hetGP"), TRUE, FALSE)]
   XX = test_set[ ,-ncol(df), drop = FALSE]
@@ -53,11 +59,14 @@ model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_point
   } else if (package == "laGP") {
     d <- darg(list(mle=TRUE, min = sqrt(.Machine$double.eps)), X)
     g <- garg(list(mle=ifelse(nugget_known, FALSE, TRUE)), Z) #mle=FALSE = no estimation for nugget term, just set to 0
-    model <- newGPsep(X = X, Z = Z, d = rep(d$start, 5), g = ifelse(nugget_known, nugget, g$start), dK = TRUE) #g = 0 or .Machine$double ? g = 0 causes Cholesky decomp error?
+    model <- newGPsep(X = X, Z = Z, d = rep(ifelse(predictor_type %in% c("quantile","normal"), 10, d$start), 5), g = ifelse(nugget_known, nugget, 0.01), dK = TRUE) #d$start working badly with quantiles
     if (nugget_known) {
-    mle <- mleGPsep(model, param="d", tmin=d$min, tmax=d$max, verb = 0)  ###d$max*constant, multiplier to make the upper limit larger so that mle:s dont get stuck to limit? 
+    mle <- mleGPsep(model, param="d", tmin=d$min, tmax=ifelse(predictor_type %in% c("quantile", "normal"), 1e06, d$max), verb = 0)  ###d$max*constant, multiplier to make the upper limit larger so that mle:s dont get stuck to limit? 
     } else {
-    mle <- mleGPsep(model, param="both", tmin=c(d$min, g$min), tmax = c(d$max, g$max), verb = 0)
+      #mle <- mleGPsep(model, param="both", tmin=c(d$min, g$min), tmax = c(d$max, 1000), verb = 0)
+      mle <- mleGPsep(model, param = "g", tmin=1e-06, tmax=1, verb = 0)
+      mleGPsep(model, param = "d", tmin = d$min, tmax=ifelse(predictor_type %in% c("quantile", "normal"), 1e06, d$max), verb = 0)
+      g_used <- mle$g
     }
     ### the following to look at the parameters
     #d <- darg(list(mle = TRUE), X) #without setting limits manually
@@ -69,6 +78,7 @@ model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_point
     model <- mleHomGP(X = X, Z = Z, known = list(g = nugget), covtype = "Gaussian")
     } else {
       model <- mleHomGP(X = X, Z = Z, covtype = "Gaussian")
+      g_used <- model$g
     }
     #print(GPmodel$theta)
   } else if (package == "mgcv") {
@@ -153,7 +163,8 @@ model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_point
   mean_std_err <- mean((test_set$se), na.rm = TRUE)
   
   metrics <- c("model time" = as.numeric(time_model), "prediction time" = as.numeric(time_pred), "rooted mean square error" = as.numeric(rmse),
-               "mean standard error" = as.numeric(mean_std_err), "Nan_SEs" = nas, "sign_p" = ifelse(package == "mgcv", min(kcheck[,4]) < 0.01, 0))
+               "mean standard error" = as.numeric(mean_std_err), "Nan_SEs" = nas, "sign_p" = ifelse(package == "mgcv", min(kcheck[,4]) < 0.01, 0),
+               "est_nug" = ifelse(package %in% c("laGP", "hetGP") & nugget_known == "FALSE", g_used, 0))
 
   plot(test_set$likelihood, test_set$pred, xlab = "observed", ylab = "predicted", #ylim = c(6000, 13000)
        main = paste0("knots: ", n_knots,", package: ", package, ", pred_type: ", predictor_type))
@@ -161,6 +172,7 @@ model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_point
   
   
   return(metrics)
+  #return(g_used)
   #print(metrics)
   #return(kcheck)
   #print(GPmodel$beta)
