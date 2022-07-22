@@ -95,4 +95,13 @@ facet_package_mstde <- function(matrix, site, resp) {
   return(plot)
 }
 
+mean_and_plot_rmsqe(comp_mat, "original", 1, 1, 0, NA)
 
+exp_decay_offset_mod <- function(data) {
+  c0 <- 0.5*min(data$rmsqe)
+  model0 <- lm(log(rmsqe - c0)~no_knots, data = data)
+  a_init <- exp(model0$coefficients[[1]])
+  b_init <- model0$coefficients[[2]]
+  mod <- nls(rmsqe ~a*exp(b*no_knots) + c, data = data, start = list(a = a_init, b = b_init, c = c0))
+  return(mod)
+}
