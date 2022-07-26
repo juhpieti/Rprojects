@@ -5,42 +5,20 @@ library(mgcv)
 library(tidyverse)
 
 source("helpers.R")
+source("autobuild_mgcv.R")
 
 load("whole_stack.Rdata")
 load("design_matrix_10K.Rdata")
+load("design_matrix_10x10K.Rdata")
 
 ##### Fitting GP & predicting ######
 
 model_metrics <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 150, package = "mlegp",
-                          predictor_type = "original", nugget_known = FALSE, nugget = 0.001, gam_type = "bam", bs = "tp", data = NULL, design_matrix = SS.stack, verb = 1) {
-
-df <- prepare_and_shuffle_data(design_matrix, predictor_type, site_no, response, data) 
-
-#   df <- as.data.frame(SS.stack[[site_no]][[response]])
-#   #df <- as.data.frame(des_mat)
-#   colnames(df)[6] <- "likelihood"
-#   df_shuffled <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ]
-#   
-#   if (!is.null(data)) { # if data is given beforehand, we shall use it instead of the shuffled one
-#     df_shuffled <- data
-#   }
-#   
-# ##### prepare predictors #####
-#   
-#   if (predictor_type %in% c("quantile", "normal")) {
-#     df_shuffled$som_respiration_rate <- sapply(df_shuffled$som_respiration_rate, function(x) {eval(prior.fn.all$pprior[[7]], list(q=x))})
-#     df_shuffled$rdConst <- sapply(df_shuffled$rdConst, function(x) {eval(prior.fn.all$pprior[[10]], list(q=x))})
-#     df_shuffled$psnTOpt <- sapply(df_shuffled$psnTOpt, function(x) {eval(prior.fn.all$pprior[[25]], list(q=x))})
-#     df_shuffled$wueConst <- sapply(df_shuffled$wueConst, function(x) {eval(prior.fn.all$pprior[[36]], list(q=x))})
-#     df_shuffled$leafGrowth <- sapply(df_shuffled$leafGrowth, function(x) {eval(prior.fn.all$pprior[[37]], list(q=x))})
-# 
-#   }
-#   
-#   if (predictor_type == "normal") {
-#     std_norm_values <- apply(df_shuffled[, -ncol(df_shuffled)], MARGIN = c(1,2), function(x) {qnorm(p = x)})
-#     df_shuffled[, -ncol(df_shuffled)] <- std_norm_values
-#   }
+                          pred_type = "original", nugget_known = FALSE, nugget = 0.001, gam_type = "bam", bs = "cr",
+                          n_interactions = 0, design_matrix = SS.stack, known_data = NULL, verb = 1) {
   
+  df <- prepare_and_shuffle_data(design_matrix, pred_type, site_no, response, known_data)  #function from Helpers.R
+
 ##### set the training & testing sets #####
   
   test_set <- df[(1:n_test_points), ]
@@ -77,15 +55,15 @@ df <- prepare_and_shuffle_data(design_matrix, predictor_type, site_no, response,
       if (nugget_known) {
         mle <- mleGPsep(model, param="d", tmin=sqrt(.Machine$double.eps), tmax=d$max, verb = 0) 
       } else {
-        if (predictor_type != "original") { ### param = "both" doesn't work with pred_type == "original", maybe due to large range of values within variables
+        if (pred_type != "original") { ### param = "both" doesn't work with pred_type == "original", maybe due to large range of values within variables
           mle <- mleGPsep(model, param="both", tmin=c(sqrt(.Machine$double.eps), g$min), tmax = c(d$max, 5), verb = 0)
         } else {
-            jmleGPsep(model, drange=c(sqrt(.Machine$double.eps), d$max), grange=c(g$min, 5), verb = 0) # this is doing mleGPsep sequentially with
+            #mle <- jmleGPsep(model, drange=c(sqrt(.Machine$double.eps), d$max), grange=c(g$min, 5), verb = 0) # this is doing mleGPsep sequentially with
                                                                                                        # param = "d", param == "g" until convergence of MLEs
-            # mle <- mleGPsep(model, param = "g", tmin=g$min, tmax=5, verb = 0)
-            # mleGPsep(model, param = "d", tmin=sqrt(.Machine$double.eps), tmax=d$max, verb = 0)
+            mle <- mleGPsep(model, param = "g", tmin=g$min, tmax=5, verb = 0)
+            mleGPsep(model, param = "d", tmin=sqrt(.Machine$double.eps), tmax=d$max, verb = 0)
         }
-      g_used <- ifelse(predictor_type == "original", mle$g, mle$theta[ncol(training_set)])
+      g_used <- ifelse(pred_type == "original", mle$g, mle$theta[ncol(training_set)])
       }
       #print(d)
        
@@ -103,51 +81,9 @@ df <- prepare_and_shuffle_data(design_matrix, predictor_type, site_no, response,
     
   ### build the mgcv-model ###
   } else if (package == "mgcv") {
-    k <- rep(10, 5) # set the basis dimensions, this (k = 10) is also default for one variable smooth
-    if (gam_type == "gam") {
-      model <- gam(likelihood ~ s(som_respiration_rate, bs = bs, k = k[1]) + s(rdConst, bs = bs, k = k[2]) + s(psnTOpt, bs = bs, k = k[3]) + s(wueConst, bs = bs, k = k[4]) + s(leafGrowth, bs = bs, k = k[5]),
-                  data = training_set, method = "REML")
-      kcheck <- k.check(model)
-      if (min(kcheck[,4]) < 0.05) { ### if k seems to be too low for some predictor, we will double it
-        k <- k + k*(kcheck[,4] < 0.05)
-        model <- gam(likelihood ~ s(som_respiration_rate, bs = bs, k = k[1]) + s(rdConst, bs = bs, k = k[2]) + s(psnTOpt, bs = bs, k = k[3]) + s(wueConst, bs = bs, k = k[4]) + s(leafGrowth, bs = bs, k = k[5]),
-                     data = training_set, method = "REML")
-        kcheck1 <- kcheck ### comment this off!!!
-        kcheck <- k.check(model)
-      }
-
-    } else { # gam_type == "bam" (we decided to use this as a default)
-             # with bam one should use method = "fREML" and bs = e.g. "cr", "ps" (avoid default bs = "tp")
-        model <- bam(likelihood ~ s(som_respiration_rate, bs = bs, k = k[1]) + s(rdConst, bs = bs, k = k[2]) + s(psnTOpt, bs = bs, k = k[3]) + s(wueConst, bs = bs, k = k[4]) + s(leafGrowth, bs = bs, k = k[5]),
-                    data = training_set, method = "fREML")
-        kcheck <- k.check(model)
-        if (min(kcheck[,4]) < 0.05) {
-          k <- k + k*(kcheck[,4] < 0.05)
-          model <- bam(likelihood ~ s(som_respiration_rate, bs = bs, k = k[1]) + s(rdConst, bs = bs, k = k[2]) + s(psnTOpt, bs = bs, k = k[3]) + s(wueConst, bs = bs, k = k[4]) + s(leafGrowth, bs = bs, k = k[5]),
-                       data = training_set, method = "fREML")
-          kcheck1 <- kcheck
-          kcheck <- k.check(model)
-        }
-        
-        pred_names <- colnames(training_set)[1:5]
-        if (min(kcheck[,4]) < 0.05) {
-          small_k_names <- pred_names[kcheck[,4] < 0.05]
-        } else {
-          small_k_names <- "None"
-        }
-        # # print(pred_names)
-        # print(min(kcheck[,4]) < 0.05)
-        # print(small_k_names)
-        #print(kcheck)
-    }
-     #print(kcheck)
-    #print(gam.check(model))
-     #plot.gam(model, pages = 1)
-    # if (min(kcheck[,4]) < 0.05) {
-    #   print(paste0(predictor_type, ", ",bs))
-    #   print(kcheck1)
-    #   print(kcheck)
-    # }
+    
+    model <- build_mgcv(training_set, "likelihood", bs = bs, type = gam_type, n_interactions = n_interactions) #function from autobuild_mgcv.R
+    
   }
   
   toc <- proc.time()
@@ -174,7 +110,7 @@ df <- prepare_and_shuffle_data(design_matrix, predictor_type, site_no, response,
   
   if (package %in% c("mlegp", "mgcv")) {
     test_set <- cbind(test_set, mod_pred$fit, mod_pred$se.fit)
-    colnames(test_set)[7:ncol(test_set)] <- c("pred", "se")
+    colnames(test_set)[(ncol(test_set) - 1):ncol(test_set)] <- c("pred", "se")
   } else if (package == "laGP") {
     test_set$pred <- mod_pred$mean
     test_set$se <- sqrt(mod_pred$s2)
@@ -182,7 +118,6 @@ df <- prepare_and_shuffle_data(design_matrix, predictor_type, site_no, response,
     test_set$pred <- mod_pred$mean
     test_set$se <- sqrt(mod_pred$sd2 + mod_pred$nugs)
   }
-  
   
 ##### calculate the metrics #####
   
@@ -197,24 +132,19 @@ df <- prepare_and_shuffle_data(design_matrix, predictor_type, site_no, response,
   
   if (verb == 1) {
     metrics <- list("model time" = as.numeric(time_model), "prediction time" = as.numeric(time_pred), "rooted mean square error" = as.numeric(rmse),
-                 "mean standard error" = as.numeric(mean_std_err), "Nan_SEs" = nas, "sign_p" = ifelse(package == "mgcv", min(kcheck[,4]) < 0.05, FALSE),
-                 "est_nug" = ifelse(package %in% c("laGP", "hetGP") & nugget_known == "FALSE", g_used, 0),
-                 "failed_predictor" = ifelse(package == "mgcv", small_k_names, 0))
+                 "mean standard error" = as.numeric(mean_std_err), "Nan_SEs" = nas,
+                 "est_nug" = ifelse(package %in% c("laGP", "hetGP") & nugget_known == "FALSE", g_used, 0))
   } else {
     metrics <- c("model time" = as.numeric(time_model), "prediction time" = as.numeric(time_pred), "rooted mean square error" = as.numeric(rmse),
                  "mean standard error" = as.numeric(mean_std_err))
   }
   
   plot(test_set$likelihood, test_set$pred, xlab = "observed", ylab = "predicted",
-       main = paste0("site: ",site_no,", resp: ",response,", knots: ", n_knots,", package: ", package, ", pred_type: ", predictor_type))
+       main = paste0("site: ",site_no,", resp: ",response,", knots: ", n_knots,", package: ", package, ", pred_type: ", pred_type))
   abline(0, 1)
   
   
   return(metrics)
-  #return(g_used)
-  #print(metrics)
-  #return(kcheck)
   #return(model)
-  #return(mle)
 }
 
