@@ -1,6 +1,18 @@
 
+shuffle_data <- function(design_matrix = SS.stack, site_no = 1, response = 1) {
+  ## check whether your data is just 1 resp 1 site or [[]][[]] type (e.g. SS.stack)?
+  if (length(design_matrix[[1]][[1]]) > 1) { #SS.stack with 12 sites, 2 responses
+    df <- as.data.frame(design_matrix[[site_no]][[response]])
+  } else {
+    df <- as.data.frame(design_matrix)
+  }
+  colnames(df)[ncol(df)] <- "likelihood"
+  df_shuffled <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ] # shuffles the data
+  
+  return(df_shuffled)
+}
 
-prepare_and_shuffle_data <- function(design_matrix = SS.stack, pred_type = "original", site_no = 1, response = 1, known_data = NULL) {
+prepare_data <- function(design_matrix = SS.stack, pred_type = "original", site_no = 1, response = 1, known_data = NULL) {
   
   if (!is.null(known_data)) { # if data is given beforehand, we shall use it instead of the shuffled one
     df_shuffled <- known_data
@@ -36,20 +48,7 @@ prepare_and_shuffle_data <- function(design_matrix = SS.stack, pred_type = "orig
   
 }
 
-shuffle_data <- function(design_matrix = SS.stack, site_no = 1, response = 1) {
-  ## check whether your data is just 1 resp 1 site or [[]][[]] type (e.g. SS.stack)?
-  if (length(design_matrix[[1]][[1]]) > 1) { #SS.stack with 12 sites, 2 responses
-    df <- as.data.frame(design_matrix[[site_no]][[response]])
-  } else {
-    df <- as.data.frame(design_matrix)
-  }
-  colnames(df)[ncol(df)] <- "likelihood"
-  df_shuffled <- df[sample(1:nrow(df), size = nrow(df), replace = FALSE), ] # shuffles the data
-  
-  return(df_shuffled)
-}
-
-exp_decay_offset_mod <- function(y,x) { 
+exp_decay_offset_mod <- function(y,x) { ### fits a model shape of y = exp(b*x) + c
   c0 <- 0.5*min(y)
   model0 <- lm(log(y - c0) ~ x)
   a_init <- exp(model0$coefficients[[1]])
