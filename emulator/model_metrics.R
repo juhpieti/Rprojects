@@ -27,7 +27,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 
                           pred_type = "original", nugget_known = FALSE, nugget = 0.001, gam_type = "bam", bs = "cr",
                           n_interactions = 0, design_matrix = SS.stack, known_data = NULL, verb = 0) {
   
-  df <- prepare_and_shuffle_data(design_matrix, pred_type, site_no, response, known_data)  #function from helpers.R
+  df <- prepare_data(design_matrix, pred_type, site_no, response, known_data)  #function from helpers.R
   # NOTE: if known data given (known_data != NULL), function isn't shuffling, can be used for comparisons
 
 ##### set the training & testing sets #####
