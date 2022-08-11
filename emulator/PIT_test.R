@@ -1,5 +1,7 @@
 library(laGP) # for rmvn function
 
+source("model_metrics.R")
+
 ### assume that we have fitted our model with test points x and have 2000 test points y
 ### and that we also have the predictive distribution y|x where x is the training data
 ### we will then simulate N predictions from that distribution for every y_i in the test set
