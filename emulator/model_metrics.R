@@ -9,16 +9,16 @@ source("helpers.R")
 source("autobuild_mgcv.R")
 
 # loading in the design matrices
-load("whole_stack.Rdata")
-load("design_matrix_10K.Rdata")
-load("design_matrix_10x10K.Rdata")
-load("design_matrix_20x10K.Rdata")
-load("design_matrix_40x10K.Rdata")
+load("data/whole_stack.Rdata")
+load("data/design_matrix_10K.Rdata")
+load("data/design_matrix_10x10K.Rdata")
+load("data/design_matrix_20x10K.Rdata")
+load("data/design_matrix_40x10K.Rdata")
 
 # loading the prior distributions & indexes
-load("priorfcn2Juho.Rdata")
-load("prior.ind.all_10.Rdata")
-load("prior.ind.all_20.Rdata")
+load("data/priorfcn2Juho.Rdata")
+load("data/prior.ind.all_10.Rdata")
+load("data/prior.ind.all_20.Rdata")
 
 
 ##### Fitting GP & predicting ######
