@@ -1,8 +1,9 @@
-### run this script in terminal with: "Rscript ~/FMI/Rprojects/hands-on-GP/helloworld.R"
+### run this script in terminal with: "Rscript ~/path/runs.R" to 
 
 source("model_metrics.R")
-load("comp_mat_hetGP_dim_2k.Rdata")
-load("laGP_mat.Rdata")
+
+### load in the matrix you want to save your experimentations
+load("laGP_mat.Rdata") 
 
 
 run_experiments <- function(n_iter, matrix_to_save, knots_list, packages_list, no_params_list, preds_list) {
@@ -46,9 +47,9 @@ run_experiments <- function(n_iter, matrix_to_save, knots_list, packages_list, n
   
 }
 
-#comp_mat_hetGP_2k <- run_experiments(1, comp_mat_hetGP_2k)
-#save(comp_mat_hetGP_2k, file = "comp_mat_hetGP_dim_2k.Rdata")
-
+### experimentating and saving the experimentations in matrix you loaded at the beginning
 laGP_mat <- run_experiments(2,laGP_mat,c(1500,2000),c("laGP"),c(5,10,20),c("original"))
+
+### saving that file
 save(laGP_mat, file = "laGP_mat.Rdata")
 
