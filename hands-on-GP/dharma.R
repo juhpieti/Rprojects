@@ -34,33 +34,38 @@ dharma_plots_cov <- function(y, pred_means, cov_matrix, m = 250) {
 
 ##### tests #####
 
-testing_data <- shuffle_data(des_mat_10_10K)
-real_obs <- testing_data$likelihood[1:2000]
+### laGP, hetGP, mgcv
+
+testing_data <- shuffle_data(des_mat_10_10K) # set the data (training set, test set to experiment with)
 
 lagpmod <- fit_model(n_knots = 1000, n_test_points = 2000, package = "laGP", pred_type = "quantile", nugget_known = FALSE, known_data = testing_data, verb = 1)
-dharma_lagp <- dharma_plots(real_obs, lagpmod$pred, lagpmod$pred_se)
+dharma_lagp <- dharma_plots(lagpmod$observed, lagpmod$pred, lagpmod$pred_se)
 
 # lagpmod_cov <- fit_model(n_knots = 1000, n_test_points = 2000, package = "laGP", pred_type = "quantile", nugget_known = FALSE, known_data = testing_data)
 # dharma_plots_cov(real_obs, lagpmod_cov$mean, lagpmod_cov$Sigma) # requires tuning of fit_model() to return cov_matrix
 
-hetmod <- fit_model(n_knots = 1000, n_test_points = 2000, package = "hetGP",pred_type = "normal", nugget_known = FALSE, known_data = testing_data, verb = 1)
-dharma_obj <- dharma_plots(real_obs, hetmod$pred, hetmod$pred_se, m = 250)
+hetmod <- fit_model(n_knots = 1000, n_test_points = 2000, package = "hetGP",pred_type = "quantile", nugget_known = FALSE, known_data = testing_data, verb = 1)
+dharma_het <- dharma_plots(hetmod$observed, hetmod$pred, hetmod$pred_se, m = 250)
 
-testDispersion(dharma_obj)
-testUniformity(dharma_obj)
-testQuantiles(dharma_obj)
-plotResiduals(dharma_obj)
+testDispersion(dharma_het)
+testUniformity(dharma_het)
+testQuantiles(dharma_het)
+plotResiduals(dharma_het)
 
 mgcvmod <- fit_model(n_knots = 1000, n_test_points = 2000, package = "mgcv", n_interactions = 5, known_data = testing_data, verb = 1)
-dharma_plots(real_obs, mgcvmod$pred, mgcvmod$pred_se, m = 250)
+dharma_plots(mgcvmod$observed, mgcvmod$pred, mgcvmod$pred_se, m = 250)
 
+# ### just for curiosity with known, univariate normal, does it look perfect?
 # 
 # y <- rnorm(1000, 0, 1)
 # 
 # dharma_plots(y, rep(0, 1000), rep(1, 1000), m = 100)
+# 
+# ### yes it does!
 
-mgcvmodel <- fit_model(n_knots = 1000, n_test_points = 2000, package = "mgcv", n_interactions = 5, known_data = testing_data)
-simulationOutput <- simulateResiduals(fittedModel = mgcvmodel, plot = T)
-plotResiduals(simulationOutput)
 
-hetmod
+# ### mgcv is included in DHARMa "supported packages" so you actually just need the model and DHARMa does the rest
+# 
+# mgcvmodel <- fit_model(n_knots = 1000, n_test_points = 2000, package = "mgcv", n_interactions = 5, known_data = testing_data)
+# simulationOutput <- simulateResiduals(fittedModel = mgcvmodel, plot = T)
+# plotResiduals(simulationOutput)
