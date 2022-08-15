@@ -21,16 +21,41 @@ load("data/prior.ind.all_10.Rdata")
 load("data/prior.ind.all_20.Rdata")
 
 
+### this is the main function I've been using this summer to:
+###   1) fit a certain model with certain data & settings
+###   2) predict the test set with the fitted model
+###   3) calculate metrics
+
+### it does these steps and returns list of metrics as well as plots predicted vs observed
+
+### description of inputs
+###   site_no: site we want to take the data from (1 to 12) NOTICE: larger data only available from site 1
+###   response: response 1 or 2 (water, carbon?) NOTICE: larger data available with response 1
+###   n_knots: number of knots (=training points) to use to fit the model
+###   package: package to use for fitting - "mlegp", "hetGP", "laGP" or "mgcv"
+###   pred_type: parameter space / predictor type - "original", "quantile" or "normal"
+###   nugget_known: Logical to tell if we want to use known nugget or estimate it (default)
+###   nugget: nugget value (default 0.001 as Gramacy's packages doesn't work with 0) in case nugget_known == False
+###   gam_interact: number of interaction terms to use when building mgcv model
+###   design_matrix: the design matrix to use to fit the model (e.g. SS.stack, des_mat, des_mat_40_10k)
+###   known_data: as default, this function shuffles the design_matrix before choosing training points and test points
+###               known_data can be given to use exactly same training / test sets for e.g. different runs with different settings
+###   verb: 0 (default) for less and 1 for more outputs
+
+
 ##### Fitting GP & predicting ######
 
-fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 150, package = "mlegp",
-                          pred_type = "original", nugget_known = FALSE, nugget = 0.001, gam_type = "bam", bs = "cr",
-                          n_interactions = 0, design_matrix = SS.stack, known_data = NULL, verb = 0) {
+fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp",
+                          pred_type = "original", nugget_known = FALSE, nugget = 0.001,
+                          gam_interact = 0, design_matrix = SS.stack, known_data = NULL, verb = 0) {
   
   df <- prepare_data(design_matrix, pred_type, site_no, response, known_data)  #function from helpers.R
   # NOTE: if known data given (known_data != NULL), function isn't shuffling, can be used for comparisons
+  # e.g. use the same data (same training points, same testing points) and just change package or parameter space
 
 ##### set the training & testing sets #####
+  
+  n_test_points <- 0.2*nrow(df) # 20% of the data for testing (150 for n = 750, 2000 for n = 10 000)
   test_set <- df[(1:n_test_points), ]
   training_set <- df[(n_test_points + 1):(n_test_points + n_knots), ]
   
@@ -66,7 +91,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 
       ### with mleGP functions (e.g. ranges to search the length-scale or nugget parameters from, initial values)
       ### d refers to length-scale parameters, g refers to nugget 
       d <- darg(list(mle=TRUE), X)
-      g <- garg(list(mle=ifelse(nugget_known, FALSE, TRUE)), Z) # mle=FALSE = no estimation for nugget term, set to starting value
+      g <- garg(list(mle=ifelse(nugget_known, FALSE, TRUE)), Z) # mle=FALSE: no estimation for nugget term, set to starting value
       
       model <- newGPsep(X = X, Z = Z, d = rep(d$start, ncol(X)), g = ifelse(nugget_known, nugget, 0.1), dK = TRUE) 
       
@@ -76,6 +101,10 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 
         if (pred_type != "original") { # param = "both" doesn't work with pred_type == "original", maybe due to large range of values within variables
           mle <- mleGPsep(model, param="both", tmin=c(sqrt(.Machine$double.eps), g$min), tmax = c(d$max, 5), verb = 0)
         } else {
+          
+            ### jmleGPsep.R limits the number of iterations in MLE process with N and could therefore save time
+            ### jmleGPsep now used, just iterates until convergence
+          
             # mle <- jmleGPsep.R(model, N = 2, drange=c(sqrt(.Machine$double.eps), d$max), grange=c(g$min, 5), verb = 1)
             mle <- jmleGPsep(model, drange=c(sqrt(.Machine$double.eps), d$max), grange=c(g$min, 5), verb = 0) # this is doing mleGPsep sequentially with
                                                                                                               # param = "d", param == "g" until convergence of MLEs
@@ -86,7 +115,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 
             # mle <- mleGPsep(model, param = "g", tmin=g$min, tmax=5, verb = 0)
         }
       g_used <- ifelse(pred_type == "original", mle$g, mle$theta[ncol(training_set)]) # if jmleGPsep used
-      #g_used <- ifelse(pred_type == "original", mle$mle[length(mle$mle)-2], mle$theta[ncol(training_set)]) # if jmleGPsep.R
+      #g_used <- ifelse(pred_type == "original", mle$mle[length(mle$mle)-2], mle$theta[ncol(training_set)]) # if jmleGPsep.R used
       }
       # print(d) # for checking how did the estimation work out, use with verb = 1 to see the estimated values
                  # sometimes it happens that the estimated values just end up at max$d, or stays at the starting value, which is suspicious
@@ -99,19 +128,19 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 
       model <- mleHomGP(X = X, Z = Z, covtype = "Gaussian")
       g_used <- model$g
     }
-    #print(model$nit_opt) # how many iterations to get the mle-values for parameters
     
     #print(model$theta) # to compare with other models
     
   ### build the mgcv-model ###
   } else if (package == "mgcv") {
     
-    model <- build_mgcv(training_set, "likelihood", bs = bs, type = gam_type, n_interactions = n_interactions) #function from autobuild_mgcv.R
-    # model <- build_mgcv(training_set, colnames(X)[ncol(X)], bs = bs, type = gam_type, n_interactions = n_interactions)
+    model <- build_mgcv(training_set, "likelihood", bs = "cr", type = "bam", n_interactions = gam_interact) # function from autobuild_mgcv.R
+    
   }
   
   toc <- proc.time()
   time_model <- as.numeric((toc - tic)[3])
+  
   
 ##### predict with the model #####
   
@@ -122,7 +151,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 
   } else if (package == "laGP") {
     mod_pred <- predGPsep(model, XX, lite = TRUE)
     deleteGPsep(model) # deletes GP object from C-side: "Any function calling newGP or newGPsep will require destruction
-                       # via these functions or there will be a memory leak"s
+                       # via these functions or there will be a memory leak"
   } else if (package == "hetGP") {
     mod_pred <- predict(model, XX)
   } else if (package == "mgcv") {
@@ -147,7 +176,6 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 
                                                       #  to get the full predictive uncertainty of the response Y (x) | DN .
                                                       #  - Vignette of hetGP
   
-    # print(scores(model, XX, test_set$likelihood, return.rmse = TRUE))
   }
   
 ##### calculate the metrics #####
@@ -164,6 +192,10 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 
   mstde <- mean((test_set$se), na.rm = TRUE)
   
   if (verb == 1) {
+    
+    PIT_histogram(test_set$likelihood, test_set$pred, test_set$se)
+    dharma_figures(test_set$likelihood, test_set$pred, test_set$se)
+    
     metrics <- list("mod_time" = as.numeric(time_model), "pred_time" = as.numeric(time_pred), "rmse" = as.numeric(rmse),
                  "mstde" = as.numeric(mstde), "observed" = test_set$likelihood, "pred" = test_set$pred, "pred_se" = test_set$se, "Nan_SEs" = nas,
                  "est_nug" = ifelse(package %in% c("laGP", "hetGP") & nugget_known == "FALSE", g_used, 0))
@@ -172,8 +204,6 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 
                  "mstde" = as.numeric(mstde))
   }
   
-  # plot(test_set$likelihood, test_set$pred, xlab = "observed", ylab = "predicted",
-  #      main = paste0("site: ",site_no,", resp: ",response,", knots: ", n_knots,", package: ", package, ", pred_type: ", pred_type))
   plot(test_set$pred, test_set$likelihood, xlab = "predicted", ylab = "observed",
        main = paste0("package: ",package,", knots: ",n_knots,", predictors: ",ncol(X),", type: ", pred_type),
        sub = paste0("data: ",nrow(design_matrix)," observations of response ", response, " from site ",site_no))
@@ -182,4 +212,3 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, n_test_points = 
   return(metrics)
   #return(model)
 }
-
