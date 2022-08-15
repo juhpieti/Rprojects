@@ -1,4 +1,7 @@
 
+### takes in design_matrix, shuffles and returns it
+### e.g. SS.stack has 12 lists (different sites) of 2 data frames (response 1 and 2) so you have to specify site and response to use
+### can be used to create a common data to use with different settigns / packages to compare performance
 shuffle_data <- function(design_matrix = SS.stack, site_no = 1, response = 1) {
   ## check whether your data is just 1 resp 1 site or [[]][[]] type (e.g. SS.stack)?
   if (length(design_matrix[[1]][[1]]) > 1) { #SS.stack with 12 sites, 2 responses
@@ -12,12 +15,15 @@ shuffle_data <- function(design_matrix = SS.stack, site_no = 1, response = 1) {
   return(df_shuffled)
 }
 
+
+### shuffles and prepares (modifies parameter space) design_matrix given to use for modeling
+### if known_data given (e.g. known_data = shuffle_data(des_mat)), only prepares and skips the shuffling
 prepare_data <- function(design_matrix = SS.stack, pred_type = "original", site_no = 1, response = 1, known_data = NULL) {
   
   if (!is.null(known_data)) { # if data is given beforehand, we shall use it instead of the shuffled one
     df_shuffled <- known_data
   } else {
-    df_shuffled <- shuffle_data(design_matrix = design_matrix, site_no = site_no, response = response) # function determined below
+    df_shuffled <- shuffle_data(design_matrix = design_matrix, site_no = site_no, response = response) # function determined above
   }
   
   if (pred_type %in% c("quantile", "normal")) { # turning the predictors into quantiles of their prior distributions
@@ -48,11 +54,52 @@ prepare_data <- function(design_matrix = SS.stack, pred_type = "original", site_
   
 }
 
-exp_decay_offset_mod <- function(y,x) { ### fits a model shape of y = exp(b*x) + c
+
+### fits a model shape of y = exp(b*x) + c
+### inputs: y and x as vectors
+### used for e.g. to predict rmse by knots or time
+exp_decay_offset_mod <- function(y,x) {
   c0 <- 0.5*min(y)
   model0 <- lm(log(y - c0) ~ x)
   a_init <- exp(model0$coefficients[[1]])
   b_init <- model0$coefficients[[2]]
   mod <- nls(y ~ a*exp(b*x)+c, start = list(a = a_init, b = b_init, c = c0), control = nls.control(maxiter = 100))
   return(mod)
+}
+
+
+### draws a histogram of empirical cdf values of observations y 
+### assumes that your model with means pred_means and sd:s pred_sds is right
+### based on PIT-theory, these cdf values should be uniformly distributed
+### therefore noticeable divergence from Uniform(0,1) suggests that your model isn't right
+PIT_histogram <- function(y, pred_means, pred_sds, m = 250) { 
+  
+  n <- length(y)
+  u <- rep(0, n)
+  
+  pred_sample <- matrix(0, m, n)
+  
+  for (i in 1:n) {
+    pred_sample[,i] <- rnorm(m, pred_means[i], pred_sds[i]) # samples values from predictive marginal univariate normals
+    u[i] <- mean(pred_sample[,i] < y[i])
+  }
+  
+  hist(u, breaks = 9, main = "histogram of empirical cdf values at observed values",
+       sub = "strong difference from Uniform(0,1) indicates problems in a model")
+}
+
+
+### plots plot.DHARMa figures (QQ-plot, residuals vs predictions) with some p-values too
+dharma_figures <- function(y, pred_means, pred_sds, m = 250) { 
+  
+  n <- length(y)
+  fitted <- pred_means
+  pred_sample <- matrix(0, n, m)
+  
+  for (i in 1:n) {
+    pred_sample[i,] <- rnorm(m, pred_means[i], pred_sds[i]) # samples values from predictive marginal univariate normals
+  }
+  
+  dharma <- createDHARMa(pred_sample, y, fitted)
+  plot(dharma)
 }
