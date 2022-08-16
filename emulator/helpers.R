@@ -1,3 +1,4 @@
+library(DHARMa)
 
 ### takes in design_matrix, shuffles and returns it
 ### e.g. SS.stack has 12 lists (different sites) of 2 data frames (response 1 and 2) so you have to specify site and response to use
@@ -16,7 +17,7 @@ shuffle_data <- function(design_matrix = SS.stack, site_no = 1, response = 1) {
 }
 
 
-### shuffles and prepares (modifies parameter space) design_matrix given to use for modeling
+### returns shuffled and prepared (modifies parameter space) design_matrix given to use for modeling
 ### if known_data given (e.g. known_data = shuffle_data(des_mat)), only prepares and skips the shuffling
 prepare_data <- function(design_matrix = SS.stack, pred_type = "original", site_no = 1, response = 1, known_data = NULL) {
   
