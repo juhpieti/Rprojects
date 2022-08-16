@@ -7,14 +7,20 @@ load("comp_mat.Rdata")
 ### these functions assume you have a matrix of experiment results
 ### matrix should include columns for time, RMSqE, MStdE, pred_type, no_knots, site_no (from 1 to 12), response (1 or 2)
 ### example matrix called comp_mat is given at comp_mat.Rdata
+### they return different kinds of plots made from that matrix of experiments
 
-### for mean_and_plot function you give the matrix of experiments, choose parameter space, study site & response, 
-### as well as the metric to plot (basicly "RMSqE" or "MStdE")
-### it will give you a plot of chosen metric against time, dots separated by shapes for different packages and by color
+
+### for compare_packages_plot() function you give the matrix of experiments, choose parameter space, study site & response,
+### as well as the number of observations in the data (750 or 10000 in my case) and number of parameters (5,10,20,40)
+### also give the metric to plot ("RMSqE" or "MStdE")
+### first it will group your experiments and calculate mean performance
+### e.g. mean rmse and time with hetGP using 2000 knots
+### then it will give you a plot of chosen metric against time, dots separated by shapes for different packages and by color
 ### for different amount of knots
-### also horizontal line drawn for mlegp performance
+### also horizontal line drawn for mlegp performance, caption will give information about that
 
-mean_and_plot <- function(matrix, site = 1, resp = 1, pred, metric = "RMSqE", ymin = 0, ymax = NA) {
+compare_packages_plot <- function(matrix, site = 1, resp = 1, pred = "original", metric = "RMSqE", n_obs = 750, n_params = 5,
+                                  ymin = 0, ymax = NA) {
   
   ### prepare mlegp values for horizontal lines
   mlegp_matrix_mean <- mlegp_matrix %>%
@@ -23,7 +29,6 @@ mean_and_plot <- function(matrix, site = 1, resp = 1, pred, metric = "RMSqE", ym
     summarise(RMSqE = mean(RMSqE),
               MStdE = mean(MStdE),
               time = mean(time)) %>% as.data.frame()
-  
   h_line_value <- mlegp_matrix_mean %>%
     select(ifelse(metric == "RMSqE", 'RMSqE', 'MStdE')) %>% as.numeric()
     #select(all_of(metric)) %>% as.numeric()
@@ -32,6 +37,8 @@ mean_and_plot <- function(matrix, site = 1, resp = 1, pred, metric = "RMSqE", ym
     select(time) %>% as.numeric %>% round(digits = 0)
   
   df <- matrix %>%
+    filter(obs == n_obs,
+           no_params == n_params) %>%
     group_by(site_no, response, package, pred_type, no_knots) %>%
     summarise(time = mean(time),
               sd_rmsqe = sd(RMSqE),
@@ -82,7 +89,8 @@ mean_and_plot <- function(matrix, site = 1, resp = 1, pred, metric = "RMSqE", ym
       #geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_mgcv), alpha = .2) +
       geom_hline(yintercept = h_line_value, linetype = 'dashed', color = 'red') + ylim(ymin, ymax) +
       geom_errorbar(aes(color = no_knots, ymin = RMSqE - sd_rmsqe, ymax = RMSqE + sd_rmsqe), alpha = 0.3, linetype = 5, size = .5, width = .05) +
-      labs(title = "Comparison (prediction accuracy) between packages", subtitle = paste(pred, "predictors used at site",site,"with response",resp),
+      labs(title = "Comparison (prediction accuracy) between packages",
+           subtitle = paste0(n_params," ", pred, " predictors used at site ",site," with response ",resp,"  (n = ",n_obs,")"),
            caption = paste0("horizontal red line: RMSqE-value with mlegp using 600 knots (", mlegp_time, " seconds)")) + xlab("time (s)")
   } else {
     plot <- df %>%
@@ -93,20 +101,21 @@ mean_and_plot <- function(matrix, site = 1, resp = 1, pred, metric = "RMSqE", ym
       #geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_mgcv), alpha = .2) +
       geom_hline(yintercept = h_line_value, linetype = 'dashed', color = 'red') + ylim(ymin, ymax) +
       geom_errorbar(aes(color = no_knots, ymin = MStdE - sd_mstde, ymax = MStdE + sd_mstde), alpha = 0.3, linetype = 5, size = .5, width = .05) +
-      labs(title = "Comparison (prediction certainty) between packages", subtitle = paste(pred, "predictors used at site",site,"with response",resp),
+      labs(title = "Comparison (prediction certainty) between packages",
+           subtitle = paste0(n_params," ", pred, " predictors used at site ",site," with response ",resp,"  (n = ",n_obs,")"),
            caption = paste0("horizontal red line: MStdE-value with mlegp using 600 knots (", mlegp_time, " seconds)")) + xlab("time (s)")
   }
-
   return(plot)
 }
 
-
-### facet_by_package is giving you three (number of packages) plots, one for each package
-### its plotting chosen metric ("RMSqE" or "MStdE") against time, predictor types separeted by shape, No. knots by color
+### compare_param_spaces_plot() is returning a plot with three (number of packages) rows/subplots, one for each package
+### its plotting chosen metric ("RMSqE" or "MStdE") against time, predictor types separeted by shape, number of knots by color
 ### this is useful to notice how the parameter space used is affecting (e.g original space seems to perform worst wit GPs)
 
-facet_by_package <- function(matrix, site = 1, resp = 1, metric = "RMSqE") {
+compare_param_spaces_plot <- function(matrix, site = 1, resp = 1, n_obs = 750, n_params = 5, metric = "RMSqE") {
   df <- matrix %>%
+    filter(obs == n_obs,
+           no_params == n_params) %>%
     group_by(site_no, response, package, pred_type, no_knots) %>%
     summarise(time = mean(time),
               sd_rmsqe = sd(RMSqE),
@@ -121,23 +130,62 @@ facet_by_package <- function(matrix, site = 1, resp = 1, metric = "RMSqE") {
       ggplot(mapping = aes(x = time, y = RMSqE, color = no_knots, shape = pred_type)) +
       geom_point(size = 2) + facet_wrap(~package, ncol = 1) +
       labs(title = "Differences (prediction accuracy) between predictor types by packages",
-           subtitle = paste0("site: ", site, ", response: ", resp))
+           subtitle = paste0("site: ", site, ", response: ", resp, ", parameters: ", n_params, ", n = ", n_obs))
     return(plot)
   } else {
     plot <- df %>%
       ggplot(mapping = aes(x = time, y = MStdE, color = no_knots, shape = pred_type)) +
       geom_point(size = 2) + facet_wrap(~package, ncol = 1) +
       labs(title = "Differences (prediction certainty) between predictor types by packages",
-           subtitle = paste0("site: ", site, ", response: ", resp))
+           subtitle = paste0("site: ", site, ", response: ", resp, ", parameters: ", n_params, ", n = ", n_obs))
     return(plot)
   }
 }
 
 
+### compare_no_params_plot() is returning a plot of chosen metric on y-axis and time on x-axis
+### it's separating number of parameters used by shape, number of knots by color
+### when calling, you need to specify metric, package used, parameter space and number of observations
+### other inputs explained:
+### no_param_list: list of number of parameters to include in the plot
+###                I recommend using three (e.g c(5,10,20) or c(10,20,40)) to keep the plot clean
+### ignore_knots_list: list of number of knots NOT to include in the plot. If runs have been done by a lot of different
+###                    number of knots, you might want not to include them all, again to keep te plot kind of clean
+
+compare_no_params_plot <- function(matrix, site = 1, resp = 1, pack = "hetGP", pred = "original", n_obs = 10000,
+                                   metric = "RMSqE", no_param_list = c(5,10,20), ignore_knots_list = c(100,300,500,3500,4500),
+                                   ymin = 0, ymax = NA) {
+  df <- matrix %>%
+    filter(obs == n_obs, package == pack, pred_type == pred, 
+           no_params %in% no_param_list,
+           !(no_knots %in% ignore_knots_list)) %>%
+    group_by(site_no, response, package, no_knots, no_params, obs) %>%
+    summarise(rmsqe = mean(RMSqE),
+              mstde = mean(MStdE),
+              time = mean(time),
+              n = n()) %>% as.data.frame()
+  
+  if (metric == "RMSqE") {
+    plot <- df %>%
+      ggplot(mapping = aes(x = time, y = rmsqe, shape = no_params, color = no_knots)) +
+      geom_point(size = 2.5) + ylim(0,ymax) +
+      labs(title = "Effect (prediction accuracy) of increasing number of parameters to calibrate",
+           subtitle = paste0(pack," with ",pred," predictors (n = ",n_obs, ")")) +
+      guides(color = guide_legend(ncol = 2))
+  } else {
+    plot <- df %>%
+      ggplot(mapping = aes(x = time, y = mstde, shape = no_params, color = no_knots)) +
+      geom_point(size = 2.5) + ylim(0,ymax) +
+      labs(title = "Effect (prediction certainty) of increasing number of parameters to calibrate",
+           subtitle = paste0(pack," with ",pred," predictors (n = ",n_obs, ")")) +
+      guides(color = guide_legend(ncol = 2))
+  }
+  return(plot)
+}
+
 ##### tests #####
+# compare_no_params_plot(experiments1, 1, 1, "laGP", "normal", no_param_list = c(5,10,20), ymax = 5000)
+# compare_packages_plot(comp_mat, pred = "original", metric = "RMSqE", n_obs = 750, ymin = 0, ymax = NA)
+# compare_param_spaces_plot(experiments1, metric = "RMSqE", n_obs = 10000, n_params = 10)
 
-mean_and_plot(comp_mat, pred = "normal", metric = "RMSqE", ymin = 0, ymax = 400)
-# facet_by_package(comp_mat, metric = "RMSqE")
 # facet_by_package(comp_mat, metric = "MStdE")
-
-
