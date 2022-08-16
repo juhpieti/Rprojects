@@ -28,7 +28,7 @@ load("data/prior.ind.all_20.Rdata")
 
 ### it does these steps and returns list of metrics as well as plots predicted vs observed
 
-### description of inputs
+### description of inputs:
 ###   site_no: site we want to take the data from (1 to 12) NOTICE: larger data only available from site 1
 ###   response: response 1 or 2 (water, carbon?) NOTICE: larger data available with response 1
 ###   n_knots: number of knots (=training points) to use to fit the model
@@ -40,6 +40,7 @@ load("data/prior.ind.all_20.Rdata")
 ###   design_matrix: the design matrix to use to fit the model (e.g. SS.stack, des_mat, des_mat_40_10k)
 ###   known_data: as default, this function shuffles the design_matrix before choosing training points and test points
 ###               known_data can be given to use exactly same training / test sets for e.g. different runs with different settings
+###   diagnostics: if TRUE, plots histogram of empirical cdf values of observations and DHARMa plots (QQ, DHARMa residuals vs predictions)
 ###   verb: 0 (default) for less and 1 for more outputs
 
 
@@ -47,7 +48,7 @@ load("data/prior.ind.all_20.Rdata")
 
 fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp",
                           pred_type = "original", nugget_known = FALSE, nugget = 0.001,
-                          gam_interact = 0, design_matrix = SS.stack, known_data = NULL, verb = 0) {
+                          gam_interact = 0, design_matrix = SS.stack, known_data = NULL, diagnostics = FALSE, verb = 0) {
   
   df <- prepare_data(design_matrix, pred_type, site_no, response, known_data)  #function from helpers.R
   # NOTE: if known data given (known_data != NULL), function isn't shuffling, can be used for comparisons
@@ -192,10 +193,6 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
   mstde <- mean((test_set$se), na.rm = TRUE)
   
   if (verb == 1) {
-    
-    PIT_histogram(test_set$likelihood, test_set$pred, test_set$se)
-    dharma_figures(test_set$likelihood, test_set$pred, test_set$se)
-    
     metrics <- list("mod_time" = as.numeric(time_model), "pred_time" = as.numeric(time_pred), "rmse" = as.numeric(rmse),
                  "mstde" = as.numeric(mstde), "observed" = test_set$likelihood, "pred" = test_set$pred, "pred_se" = test_set$se, "Nan_SEs" = nas,
                  "est_nug" = ifelse(package %in% c("laGP", "hetGP") & nugget_known == "FALSE", g_used, 0))
@@ -208,6 +205,11 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
        main = paste0("package: ",package,", knots: ",n_knots,", predictors: ",ncol(X),", type: ", pred_type),
        sub = paste0("data: ",nrow(design_matrix)," observations of response ", response, " from site ",site_no))
   abline(0, 1)
+  
+  if (diagnostics == TRUE) {
+    PIT_histogram(test_set$likelihood, test_set$pred, test_set$se)
+    dharma_figures(test_set$likelihood, test_set$pred, test_set$se)
+  }
   
   return(metrics)
   #return(model)
