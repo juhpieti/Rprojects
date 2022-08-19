@@ -21,8 +21,7 @@ source("model_metrics.R")
 
 
 ### load in the matrix you want to save your experimentations
-load("laGP_mat.Rdata") 
-
+load("experiments1.Rdata") 
 
 run_experiments <- function(n_iter, matrix_to_save, knots_list, packages_list, no_params_list, preds_list) {
   
@@ -39,19 +38,19 @@ run_experiments <- function(n_iter, matrix_to_save, knots_list, packages_list, n
         for (pred in preds_list) {
           if (5 %in% no_params_list) {
             metrics_5 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_5,verb=0)
-            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,knots,metrics_5[[3]],metrics_5[[4]],metrics_5[[1]]+metrics_5[[2]],5,10000)
+            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_5[[3]],metrics_5[[4]],metrics_5[[1]]+metrics_5[[2]],5,10000)
           }
           if (10 %in% no_params_list) {
             metrics_10 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_10,verb=0)
-            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,knots,metrics_10[[3]],metrics_10[[4]],metrics_10[[1]]+metrics_10[[2]],10,10000)
+            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_10[[3]],metrics_10[[4]],metrics_10[[1]]+metrics_10[[2]],10,10000)
           }
           if (20 %in% no_params_list) {
             metrics_20 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_20,verb=0)
-            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,knots,metrics_20[[3]],metrics_20[[4]],metrics_20[[1]]+metrics_20[[2]],20,10000)
+            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_20[[3]],metrics_20[[4]],metrics_20[[1]]+metrics_20[[2]],20,10000)
           }
           if (40 %in% no_params_list) {
             metrics_40 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_40,verb=0)
-            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,knots,metrics_40[[3]],metrics_40[[4]],metrics_40[[1]]+metrics_40[[2]],40,10000)
+            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_40[[3]],metrics_40[[4]],metrics_40[[1]]+metrics_40[[2]],40,10000)
           }
         }
       }
@@ -66,13 +65,8 @@ run_experiments <- function(n_iter, matrix_to_save, knots_list, packages_list, n
 }
 
 ### experimentating and saving the experimentations in matrix you loaded at the beginning
-laGP_mat <- run_experiments(2,laGP_mat,c(1500,2000),c("laGP"),c(5,10,20),c("original"))
+experiments1 <- run_experiments(1,experiments1,c(3000,4000,5000,6000,7000,8000),c("hetGP"),c(20),c("original"))
 
 ### saving the updatet matrix
-save(laGP_mat, file = "laGP_mat.Rdata")
+save(experiments1, file = "experiments1.Rdata")
 
-
-# test <- run_experiments(5, test, c(100),c("laGP", "hetGP", "mgcv"),c(5),c("original"))
-# test
-# test %>%
-#   ggplot(aes(x = time, y = RMSqE, color = no_knots, shape = package)) + geom_point(size = 3)
