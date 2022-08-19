@@ -16,13 +16,43 @@ fit_model(site_no = 1, response = 1, n_knots = 100, package = "mlegp", pred_type
 ### calculated some metrics, printed them and plotted observed values vs predicted values with 45 degree line
 
 ### another one:
-fit_model(n_knots = 1000, package = "hetGP", pred_type = "quantile", 
+set.seed(12345)
+
+output <- fit_model(n_knots = 1000, package = "hetGP", pred_type = "quantile", 
           nugget_known = FALSE, design_matrix = des_mat_10_10K, diagnostics = TRUE, verb = 1)
 
-### that call fitted a GP (with hetGP) to des_mat_10_10K (10 000 x 11 matrix) with 1000 knots
-### no need to think about site_no and response as larger data are just from site 1 with response 1
-### we also changed from original parameter space to quantile space and used estimated nugget
-### diagnostics = TRUE gave us a couple extra plots to examine the suitability of the model fitted
-### verb = 1 gave us a bit more information about the fit & performance, e.g. estimated nugget = 0.0099
+output$est_nug # 0.01437
 
-###### matrix of experiments? use runs.R to create experiments? use plot functions to give plots?
+### that call fitted a GP (with hetGP) using des_mat_10_10K (10 000 x 11 matrix) with 1000 knots
+### no need to think about site_no and response as larger data are just from site 1 with response 1
+### we also changed from original parameter space to quantile space and used estimated nugget instead of 0
+### diagnostics = TRUE gave us a couple extra plots to examine the suitability of the model fitted
+### verb = 1 gave us a bit more information about the fit & performance, e.g. estimated nugget = 0.01625
+
+### this is now probably a bit messy way of doing things, but here's what I end up with for experimentation:
+
+### first create a data frame to save experiment results in (these columns are expected from data frame given
+### as input for my plotting functions, we will have one example below)
+
+df_experiments <- data.frame(site_no = NA, response = NA, package = NA, pred_type = NA, no_knots = NA,
+                             RMSqE = NA, MStdE = NA, time = NA, no_params = NA, obs = NA)
+df_experiments <- df_experiments[-1, ] # delete the first row for just empty data frame with column names
+
+df_experiments <- run_experiments(n_iter = 3, matrix_to_save = df_experiments, knots_list = c(100,200,300,400,500,600),
+                                  packages_list = c("hetGP", "laGP", "mgcv"), no_params_list = c(5),
+                                  preds_list = c("quantile", "normal"))
+
+### run_experiments() does n_iter iterations of model runs which settings given as input
+### e.g. here we made 12 runs (6 different number of knots, 2 different param spaces) for each package (hetGP, laGP, mgcv)
+### so in total 12*3 = 36 runs
+### n_iter = 3 told to do this process 3 times, giving 3*54 = 162 runs
+### no_params_list = c(5) told to experiment only 5-parameter-data. We could give e.g c(5,10,20,40) to explore dimensions.
+### !check runs.R script for more information about run_experiments()!
+
+nrow(df_experiments) # 162
+head(df_experiments, 10)
+
+compare_packages_plot(matrix = df_experiments, pred = "normal", metric = "RMSqE", n_obs = 10000, n_params = 5)
+compare_param_spaces_plot(matrix = df_experiments, n_obs = 10000)
+
+### other plots too?? explain!!!
