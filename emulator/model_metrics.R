@@ -26,7 +26,7 @@ load("data/prior.ind.all_20.Rdata")
 ###   2) predict the test set with the fitted model
 ###   3) calculate metrics
 
-### it does these steps and returns list of metrics as well as plots predicted vs observed
+### it does these steps and RETURNS list of metrics as well as plots predicted vs observed
 
 ### description of inputs:
 ###   site_no: site we want to take the data from (1 to 12) NOTICE: larger data only available from site 1
@@ -63,13 +63,11 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
   X = training_set[, -ncol(df), drop = FALSE] # predictor matrix for training
   Z = training_set[, ncol(df), drop = ifelse(package %in% c("laGP", "hetGP"), TRUE, FALSE)] # vector of observations for training
   XX = test_set[ ,-ncol(df), drop = FALSE] # predictor matrix for testing
-  
-  if (package == "hetGP") {
-    X <- apply(X, 1:2, function(x) {round(x, digits = 100)}) # rounding (with a large number of digits)digits
-    XX <- apply(XX, 1:2, function(x) {round(x, digits = 100)}) # fixed a problem "length(Z) should be equal to sum(mult)" with mleHomGP
-                                                               # where sum(mult) = nrow(X) in our case with no replicates 
+
+  if (package == "hetGP") { # hetGP works with matrix, using data frame had some errors
+    X <- as.matrix(X)
+    XX <- as.matrix(XX)
   }
-  
   
 ##### build the model #####
   
@@ -196,6 +194,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
     metrics <- list("mod_time" = as.numeric(time_model), "pred_time" = as.numeric(time_pred), "rmse" = as.numeric(rmse),
                  "mstde" = as.numeric(mstde), "observed" = test_set$likelihood, "pred" = test_set$pred, "pred_se" = test_set$se, "Nan_SEs" = nas,
                  "est_nug" = ifelse(package %in% c("laGP", "hetGP") & nugget_known == "FALSE", g_used, 0))
+    
   } else {
     metrics <- c("mod_time" = as.numeric(time_model), "pred_time" = as.numeric(time_pred), "rmse" = as.numeric(rmse),
                  "mstde" = as.numeric(mstde))
@@ -203,14 +202,15 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
   
   plot(test_set$pred, test_set$likelihood, xlab = "predicted", ylab = "observed",
        main = paste0("package: ",package,", knots: ",n_knots,", predictors: ",ncol(X),", type: ", pred_type),
-       sub = paste0("data: ",nrow(design_matrix)," observations of response ", response, " from site ",site_no))
+       sub = paste0("data: ",nrow(df)," observations of response ", response, " from site ",site_no))
   abline(0, 1)
   
   if (diagnostics == TRUE) {
-    PIT_histogram(test_set$likelihood, test_set$pred, test_set$se)
-    dharma_figures(test_set$likelihood, test_set$pred, test_set$se)
+    PIT_histogram(test_set$likelihood, test_set$pred, test_set$se) # function from helpers.R
+    dharma_figures(test_set$likelihood, test_set$pred, test_set$se) # function from helpers.R
   }
   
   return(metrics)
   #return(model)
 }
+
