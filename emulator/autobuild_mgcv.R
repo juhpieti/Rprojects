@@ -1,7 +1,7 @@
 library(mgcv)
 
 ### assume that data is your design matrix and var is the name of your response variabe (e.g. "likelihood" in our case)
-### this function will build and return you a gam model with n_interaction interaction terms (default = 0)
+### this function will build and RETURN you a gam model with n_interaction interaction terms (default = 0)
 ### you can also tune your basis (cr = cubic regression as a default) or set type = "gam" to fit "normal gam"
 
 build_mgcv <- function(data, var, bs = "cr", type = "bam", n_interactions = 0) {
