@@ -1,13 +1,12 @@
 library(tidyverse)
 source("helpers.R")
 load("mlegp_matrix.Rdata")
-load("comp_mat.Rdata")
 
 
 ### these functions assume you have a matrix of experiment results
 ### matrix should include columns for time, RMSqE, MStdE, pred_type, no_knots, site_no (from 1 to 12), response (1 or 2)
 ### example matrix called comp_mat is given at comp_mat.Rdata
-### they return different kinds of plots made from that matrix of experiments
+### they RETURN different kinds of plots made from that matrix of experiments
 
 
 ### for compare_packages_plot() function you give the matrix of experiments, choose parameter space, study site & response,
@@ -68,24 +67,24 @@ compare_packages_plot <- function(matrix, site = 1, resp = 1, pred = "original",
   } else {y_mgcv <- df_mgcv$MStdE}
   
   
-  #mod_hetgp <- exp_decay_offset_mod_rmsqe(df %>% filter(package == "hetGP"))
-  mod_hetgp <- exp_decay_offset_mod(y_het, x_het)
-  mod_lagp <- exp_decay_offset_mod(y_lagp, x_lagp)
-  #mod_mgcv <- exp_decay_offset_mod(y_mgcv, x_mgcv)
-  
-  x_grid <- seq(min(df$time),max(df$time),.1)
+  # mod_hetgp <- exp_decay_offset_mod_rmsqe(df %>% filter(package == "hetGP"))
+  # mod_hetgp <- exp_decay_offset_mod(y_het, x_het)
+  # mod_lagp <- exp_decay_offset_mod(y_lagp, x_lagp)
+  # mod_mgcv <- exp_decay_offset_mod(y_mgcv, x_mgcv)
+  # 
+  # x_grid <- seq(min(df$time),max(df$time),.1)
   # pred_hetgp <- predict(mod_hetgp, newdata = data.frame(time = x_grid))
-  pred_hetgp <- predict(mod_hetgp, newdata = data.frame(x = x_grid))
-  pred_lagp <- predict(mod_lagp, newdata = data.frame(x = x_grid))
-  #pred_mgcv <- predict(mod_mgcv, newdata = data.frame(x = x_grid))
-  pred_data <- data.frame(x_grid = x_grid, pred_hetgp = pred_hetgp, pred_lagp = pred_lagp)#, pred_mgcv = pred_mgcv)
-  
+  # pred_hetgp <- predict(mod_hetgp, newdata = data.frame(x = x_grid))
+  # pred_lagp <- predict(mod_lagp, newdata = data.frame(x = x_grid))
+  # pred_mgcv <- predict(mod_mgcv, newdata = data.frame(x = x_grid))
+  # pred_data <- data.frame(x_grid = x_grid, pred_hetgp = pred_hetgp, pred_lagp = pred_lagp)#, pred_mgcv = pred_mgcv)
+
   if (metric == "RMSqE") {
     plot <- df %>%
       ggplot(mapping = aes(x = time, y = RMSqE)) +
       geom_point(mapping = aes(shape = package, color = no_knots), size = 3) +
-      geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_hetgp), alpha = .2) +
-      geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_lagp), alpha = .2) +
+      #geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_hetgp), alpha = .2) +
+      #geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_lagp), alpha = .2) +
       #geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_mgcv), alpha = .2) +
       geom_hline(yintercept = h_line_value, linetype = 'dashed', color = 'red') + ylim(ymin, ymax) +
       geom_errorbar(aes(color = no_knots, ymin = RMSqE - sd_rmsqe, ymax = RMSqE + sd_rmsqe), alpha = 0.3, linetype = 5, size = .5, width = .05) +
@@ -96,8 +95,8 @@ compare_packages_plot <- function(matrix, site = 1, resp = 1, pred = "original",
     plot <- df %>%
       ggplot(mapping = aes(x = time, y = MStdE)) +
       geom_point(mapping = aes(shape = package, color = no_knots), size = 3) +
-      geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_hetgp), alpha = .2) +
-      geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_lagp), alpha = .2) +
+      #geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_hetgp), alpha = .2) +
+      #geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_lagp), alpha = .2) +
       #geom_line(data = pred_data, mapping = aes(x = x_grid, y = pred_mgcv), alpha = .2) +
       geom_hline(yintercept = h_line_value, linetype = 'dashed', color = 'red') + ylim(ymin, ymax) +
       geom_errorbar(aes(color = no_knots, ymin = MStdE - sd_mstde, ymax = MStdE + sd_mstde), alpha = 0.3, linetype = 5, size = .5, width = .05) +
@@ -184,8 +183,14 @@ compare_no_params_plot <- function(matrix, site = 1, resp = 1, pack = "hetGP", p
 }
 
 ##### tests #####
-# compare_no_params_plot(experiments1, 1, 1, "laGP", "normal", no_param_list = c(5,10,20), ymax = 5000)
+# compare_no_params_plot(experiments1, 1, 1, "hetGP", "original", no_param_list = c(10,20,40), ymax = NA)
 # compare_packages_plot(comp_mat, pred = "original", metric = "RMSqE", n_obs = 750, ymin = 0, ymax = NA)
 # compare_param_spaces_plot(experiments1, metric = "RMSqE", n_obs = 10000, n_params = 10)
 
 # facet_by_package(comp_mat, metric = "MStdE")
+
+# plot3 <- compare_packages_plot(comp_mat, 1, 1, "normal", "MStdE", 750, 5, ymax = 300)
+
+
+# compare_no_params_plot(experiments1, 1, 1, "hetGP", "original", 10000,"RMSqE",c(10,20,40), c(100,300,500,1500,2500,3500,4500))
+# compare_packages_plot(experiments1, 1, 1, "quantile", "RMSqE", 10000, 10)
