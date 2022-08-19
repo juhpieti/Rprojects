@@ -56,7 +56,7 @@ prepare_data <- function(design_matrix = SS.stack, pred_type = "original", site_
 }
 
 
-### fits a model shape of y = exp(b*x) + c
+### fits a model shape of y = exp(b*x) + c , and returns it
 ### inputs: y and x as vectors
 ### used for e.g. to predict rmse by knots or time
 exp_decay_offset_mod <- function(y,x) {
@@ -70,6 +70,7 @@ exp_decay_offset_mod <- function(y,x) {
 
 
 ### draws a histogram of empirical cdf values of observations y 
+### doesn't return anything
 ### assumes that your model with means pred_means and sd:s pred_sds is right
 ### based on PIT-theory, these cdf values should be uniformly distributed
 ### therefore noticeable divergence from Uniform(0,1) suggests that your model isn't right
@@ -91,6 +92,7 @@ PIT_histogram <- function(y, pred_means, pred_sds, m = 250) {
 
 
 ### plots plot.DHARMa figures (QQ-plot, residuals vs predictions) with some p-values too
+### doesn't return anything
 dharma_figures <- function(y, pred_means, pred_sds, m = 250) { 
   
   n <- length(y)
