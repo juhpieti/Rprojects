@@ -1,4 +1,4 @@
-## Overview
+## Project overview
 This project includes my scripts working with statistical emulators. I was experimenting with three different packages (hetGP, laGP, mgcv) to find one to replace the current emulator (mlegp) used in PEcAn (https://github.com/PecanProject/pecan).
 
 ### Master function
