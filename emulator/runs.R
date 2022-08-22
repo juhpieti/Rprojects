@@ -3,7 +3,9 @@ source("model_metrics.R")
 ### Run this script in terminal with: "Rscript ~/path/runs.R"
 ### to produce experimentations and save them into a predefined matrix.
 
-### HOW TO MODIFY THIS SCRIPT:
+### of course the function run_experiments() can be called in Rstudio to produce experiments into a matrix too (see intro.R)
+
+### HOW TO MODIFY THIS SCRIPT BEFORE RUNNING:
   # 1) load in the matrix / Rdata you want to save your experimentations in
   # 2) in the end when you call the function, modify the parameters based on what kind of experiments you want to have
   #    (see function inputs described below)
