@@ -6,13 +6,14 @@ The main function to work with is `fit_model()` from 'model_metrics.R'. Its cons
 
 ### Other scripts in the project
 In addition to `model_metrics.R` the project includes the following R.scripts:
-* helpers.R (helper functions for `fit_model()` to use)
-* autobuild_mgcv.R (to automatise mgcv model building)
-* plotting_functions.R (to visualize results from experiments)
-* runs.R (to run experiments)
-* PIT_test.R (to draw PIT histograms)
-* dharma.R (to do residual diagnostics using DHARMa-package)
+* `helpers.R` (helper functions for `fit_model()` to use)
+* `autobuild_mgcv.R` (to automatise mgcv model building)
+* `plotting_functions.R` (to visualize results from experiments)
+* `runs.R` (to run experiments)
+* `PIT_test.R` (to draw PIT histograms)
+* `dharma.R` (to do residual diagnostics using DHARMa-package)
+
 To get information about certain script and functions in it, open the script and read the inline comments.
 
-### how to get started
+### How to get started?
 I've made a special script called `intro.R` to introduce the basics of using these scripts mentioned above. Go it through to get an idea of the workflow I have used for experimenting between packages.
