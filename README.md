@@ -1,11 +1,12 @@
-This repository includes my scripts working with statistical emulators.
+## Overview
+This project includes my scripts working with statistical emulators. I was experimenting with three different packages (hetGP, laGP, mgcv) to find one to replace the current emulator (mlegp) used in PEcAn (https://github.com/PecanProject/pecan).
 
-### master function
-The main function to work with is `r fit_model()` from 'model_metrics.R'. Its construction is divided into smaller scripts e.g. `r helpers.R` or `r autobuild_mgcv.R`.
+### Master function
+The main function to work with is `fit_model()` from 'model_metrics.R'. Its construction is divided into smaller scripts e.g. `helpers.R` or `autobuild_mgcv.R`.
 
-### other scripts in the project
-In addition to `r model_metrics.R` the project includes the following R.scripts:
-* helpers.R (helper functions for `r fit_model()` to use)
+### Other scripts in the project
+In addition to `model_metrics.R` the project includes the following R.scripts:
+* helpers.R (helper functions for `fit_model()` to use)
 * autobuild_mgcv.R (to automatise mgcv model building)
 * plotting_functions.R (to visualize results from experiments)
 * runs.R (to run experiments)
@@ -14,4 +15,4 @@ In addition to `r model_metrics.R` the project includes the following R.scripts:
 To get information about certain script and functions in it, open the script and read the inline comments.
 
 ### how to get started
-I've made a special script called 'intro.R' to introduce the basics of using these scripts mentioned above. Go it through to get an idea of the workflow I have used for experimenting between packages.
+I've made a special script called `intro.R` to introduce the basics of using these scripts mentioned above. Go it through to get an idea of the workflow I have used for experimenting between packages.
