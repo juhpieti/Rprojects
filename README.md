@@ -1,11 +1,11 @@
 This repository includes my scripts working with statistical emulators.
 
-### master function ###
-The main function to work with is 'fit_model()' from 'model_metrics.R'. Its construction is divided into smaller scripts e.g. 'helpers.R' or 'autobuild_mgcv.R'.
+### master function
+The main function to work with is `r fit_model()` from 'model_metrics.R'. Its construction is divided into smaller scripts e.g. `r helpers.R` or `r autobuild_mgcv.R`.
 
-### other scripts in the project###
-In addition to 'model_metrics.R' the project includes the following R.scripts:
-* helpers.R (helper functions for 'fit_model()' to use)
+### other scripts in the project
+In addition to `r model_metrics.R` the project includes the following R.scripts:
+* helpers.R (helper functions for `r fit_model()` to use)
 * autobuild_mgcv.R (to automatise mgcv model building)
 * plotting_functions.R (to visualize results from experiments)
 * runs.R (to run experiments)
@@ -13,5 +13,5 @@ In addition to 'model_metrics.R' the project includes the following R.scripts:
 * dharma.R (to do residual diagnostics using DHARMa-package)
 To get information about certain script and functions in it, open the script and read the inline comments.
 
-### how to get started ###
+### how to get started
 I've made a special script called 'intro.R' to introduce the basics of using these scripts mentioned above. Go it through to get an idea of the workflow I have used for experimenting between packages.
