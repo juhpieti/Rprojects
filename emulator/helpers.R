@@ -58,6 +58,46 @@ prepare_data <- function(design_matrix = SS.stack, pred_type = "original", site_
 }
 
 
+### takes in matrix of experiments, runs new experiments, adds them to that matrix and RETURNS the updated matrix
+### (with new experiments)
+### CHECK runs.R (can be used to use run_experiment() at background for new experiments)
+### FOR DETAILED INFORMATION ABOUT THE FUNCTION & ITS INPUTS!
+run_experiments <- function(n_iter, matrix_to_save, knots_list, packages_list, no_params_list, preds_list) {
+  
+  for (i in 1:n_iter) {
+    df_5 <- shuffle_data(des_mat)
+    df_10 <- shuffle_data(des_mat_10_10K)
+    df_20 <- shuffle_data(des_mat_20_10K)
+    df_40 <- shuffle_data(des_mat_40_10K)
+    
+    for (package in packages_list) {
+      for (knots in knots_list) {
+        for (pred in preds_list) {
+          if (5 %in% no_params_list) {
+            metrics_5 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_5,verb=0)
+            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_5[[3]],metrics_5[[4]],metrics_5[[1]]+metrics_5[[2]],5,10000)
+          }
+          if (10 %in% no_params_list) {
+            metrics_10 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_10,verb=0)
+            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_10[[3]],metrics_10[[4]],metrics_10[[1]]+metrics_10[[2]],10,10000)
+          }
+          if (20 %in% no_params_list) {
+            metrics_20 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_20,verb=0)
+            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_20[[3]],metrics_20[[4]],metrics_20[[1]]+metrics_20[[2]],20,10000)
+          }
+          if (40 %in% no_params_list) {
+            metrics_40 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_40,verb=0)
+            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_40[[3]],metrics_40[[4]],metrics_40[[1]]+metrics_40[[2]],40,10000)
+          }
+        }
+      }
+    }
+  }
+  
+  return(matrix_to_save)
+}
+
+
 ### fits a model shape of y = exp(b*x) + c , and RETURNS it
 ### inputs: y and x as vectors
 ### used for e.g. to predict rmse by knots or time
@@ -69,6 +109,13 @@ exp_decay_offset_mod <- function(y,x) {
   mod <- nls(y ~ a*exp(b*x)+c, start = list(a = a_init, b = b_init, c = c0), control = nls.control(maxiter = 100))
   return(mod)
 }
+
+
+
+### for the two following functions, inputs:
+### y = observed values
+### pred_means = corresponding predictive means
+### pred_sds = corresponding predictive standard deviations
 
 
 ### draws a histogram of empirical cdf values of observations y 

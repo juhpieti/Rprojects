@@ -12,7 +12,7 @@ source("model_metrics.R")
   #    (see function inputs described below)
   # 3) remember to save the matrix with added experiments into a Rdata-file in the end too
 
-### INPUTS:
+### INPUTS of run_experiment():
 ### n_iter: number of iterations (each iteration has the same data used for different knots, packages etc)
 ### matrix_to_save: empty matrix or matrix that has the earlier experiments to be expanded with columns:
 ###                 site_no, response, package, pred_type, no_knots, RMSqE, MStdE, time, no_params, obs   
@@ -30,52 +30,17 @@ source("model_metrics.R")
 ### save it to updated_matrix
 
 
-### load in the matrix you want to save your experimentations
-load("experiments.Rdata") 
-
-run_experiments <- function(n_iter, matrix_to_save, knots_list, packages_list, no_params_list, preds_list) {
-  
-  tic <- proc.time() ### to see how much time this iteration set took
-
-  for (i in 1:n_iter) {
-    df_5 <- shuffle_data(des_mat)
-    df_10 <- shuffle_data(des_mat_10_10K)
-    df_20 <- shuffle_data(des_mat_20_10K)
-    df_40 <- shuffle_data(des_mat_40_10K)
-
-    for (package in packages_list) {
-      for (knots in knots_list) {
-        for (pred in preds_list) {
-          if (5 %in% no_params_list) {
-            metrics_5 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_5,verb=0)
-            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_5[[3]],metrics_5[[4]],metrics_5[[1]]+metrics_5[[2]],5,10000)
-          }
-          if (10 %in% no_params_list) {
-            metrics_10 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_10,verb=0)
-            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_10[[3]],metrics_10[[4]],metrics_10[[1]]+metrics_10[[2]],10,10000)
-          }
-          if (20 %in% no_params_list) {
-            metrics_20 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_20,verb=0)
-            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_20[[3]],metrics_20[[4]],metrics_20[[1]]+metrics_20[[2]],20,10000)
-          }
-          if (40 %in% no_params_list) {
-            metrics_40 <- fit_model(1,1,knots,package,pred,FALSE,0.001,known_data=df_40,verb=0)
-            matrix_to_save[nrow(matrix_to_save)+1, ] <- list(1,1,package,pred,as.character(knots),metrics_40[[3]],metrics_40[[4]],metrics_40[[1]]+metrics_40[[2]],40,10000)
-          }
-        }
-      }
-    }
-  }
-
-  toc <- proc.time()
-  print((toc-tic)[[3]])
-  
-  return(matrix_to_save)
-}
+### load in the matrix you want to save your experiments
+load("data/experiments.Rdata") 
 
 ### experimenting and saving the experiments in matrix you loaded at the beginning
-experiments <- run_experiments(1,experiments,c(5000,6000,7000,8000),c("hetGP"),c(5,10),c("original"))
+tic <- proc.time() # to see how much time this iteration set took
+
+experiments <- run_experiments(1,experiments,c(5000,6000,7000,8000),c("hetGP"),c(5,10),c("original")) # function from helpers.R
+toc <- proc.time()
+
+print((toc-tic)[[3]])
 
 ### saving the updated matrix
-save(experiments, file = "experiments.Rdata")
+save(experiments, file = "data/experiments.Rdata")
 
