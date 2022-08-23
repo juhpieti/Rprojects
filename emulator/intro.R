@@ -1,5 +1,4 @@
 source("model_metrics.R")
-source("runs.R")
 source("plotting_functions.R")
 
 ### the main function is fit_model() from model_metrics.R
@@ -45,14 +44,16 @@ df_experiments <- run_experiments(n_iter = 3, matrix_to_save = df_experiments, k
 ### run_experiments() does n_iter iterations of model runs which settings given as input
 ### e.g. here we made 12 runs (6 different number of knots, 2 different param spaces) for each package (hetGP, laGP, mgcv)
 ### so in total 12*3 = 36 runs
-### n_iter = 3 told to do this process 3 times, giving 3*54 = 162 runs
+### n_iter = 3 told to do this process 3 times, giving 3*36 = 108 runs
 ### no_params_list = c(5) told to experiment only 5-parameter-data. We could give e.g c(5,10,20,40) to explore dimensions.
 ### !check runs.R script for more information about run_experiments()!
 
-nrow(df_experiments) # 162
+nrow(df_experiments) # 108
 head(df_experiments, 10)
 
-compare_packages_plot(matrix = df_experiments, pred = "normal", metric = "RMSqE", n_obs = 10000, n_params = 5)
+### then we can use some functions from plotting_functions.R to visualize the experiments
+compare_packages_plot(matrix = df_experiments, pred = "quantile", metric = "RMSqE", n_obs = 10000, n_params = 5)
 compare_param_spaces_plot(matrix = df_experiments, n_obs = 10000)
 
-### other plots too?? explain!!!¨
+### If we would have experiments with different amount of parameters too, we could use compare_no_params_plot()
+### to visualize differences between those
