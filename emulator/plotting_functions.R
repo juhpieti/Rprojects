@@ -1,6 +1,6 @@
 library(tidyverse)
 source("helpers.R")
-load("mlegp_matrix.Rdata") # to draw horizontal lines of mlegp performance
+load("data/mlegp_matrix.Rdata") # to draw horizontal lines of mlegp performance
 
 ### these functions assume you have a matrix of experiment results (1st input)
 ### matrix should include columns for time, RMSqE, MStdE, pred_type, no_knots, site_no (from 1 to 12), response (1 or 2)
