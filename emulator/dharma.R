@@ -6,7 +6,8 @@ source("model_metrics.R")
 ### pred_sds = prediction standard deviation (dharma_plots_cov() will take the whole predictive covariance matrix)
 ### m = number of simulations
 
-### plots you DHARMa-plots and returns DHARMa object
+
+### dharma_plots() plots you DHARMa-plots and RETURNS DHARMa object
 ### simulations/samples to create DHARMa object are done by sampling from univariate normal distributions with
 ### given means and sd's 
 
@@ -25,8 +26,10 @@ dharma_plots <- function(y, pred_means, pred_sds, m = 250) {
   return(dharma)
 }
 
+
 ### similar to dharma_plots() but instead to create DHARMa-object,
 ### it samples from multivariate normal using covariance matrix given
+
 dharma_plots_cov <- function(y, pred_means, cov_matrix, m = 250) {
   
   n <- length(y)
@@ -39,7 +42,7 @@ dharma_plots_cov <- function(y, pred_means, cov_matrix, m = 250) {
 }
 
 
-##### tests #####
+##### tests / examples #####
 
 ### laGP, hetGP, mgcv
 

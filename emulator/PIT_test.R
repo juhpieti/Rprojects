@@ -1,4 +1,4 @@
-library(laGP) # for rmvn function
+library(laGP) # for rmvn function to sample multivariate normal
 
 source("model_metrics.R")
 
@@ -36,7 +36,7 @@ PIT_test <- function(y, pred_means, pred_covmat, m = 250, return_predictions = T
   }
 }
 
-### I'm doing another function too, that doesn't take covariance matrix but just the diagonal of it = standard deviations
+### I'm doing another function too, that doesn't take covariance matrix but just the diagonal of it = variances
 ### just because at least predict.hetGP() gives you only the predictive variances 
 
 PIT_test_sd <- function(y, pred_means, pred_sds, m = 250, return_predictions = TRUE) { 

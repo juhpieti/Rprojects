@@ -4,7 +4,7 @@ library(laGP)
 library(hetGP)
 library(mgcv)
 
-# laoding in functions used inside this fit_model function
+# laoding in functions used in fit_model() function
 source("helpers.R")
 source("autobuild_mgcv.R")
 
@@ -26,7 +26,7 @@ load("data/prior.ind.all_20.Rdata")
 ###   2) predict the test set with the fitted model
 ###   3) calculate metrics
 
-### it does these steps and RETURNS list of metrics as well as plots predicted vs observed
+### it does these steps and RETURNS list of metrics as well as plots predicted vs observed (as default)
 
 ### description of inputs:
 ###   site_no: site we want to take the data from (1 to 12) NOTICE: larger data only available from site 1
@@ -50,7 +50,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
                           pred_type = "original", nugget_known = FALSE, nugget = 0.001,
                           gam_interact = 0, design_matrix = SS.stack, known_data = NULL, diagnostics = FALSE, verb = 0) {
   
-  df <- prepare_data(design_matrix, pred_type, site_no, response, known_data)  #function from helpers.R
+  df <- prepare_data(design_matrix, pred_type, site_no, response, known_data)  # function from helpers.R
   # NOTE: if known data given (known_data != NULL), function isn't shuffling, can be used for comparisons
   # e.g. use the same data (same training points, same testing points) and just change package or parameter space
 
@@ -89,6 +89,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
       ### darg and garg helps you to automate model building by giving you parameters to use
       ### with mleGP functions (e.g. ranges to search the length-scale or nugget parameters from, initial values)
       ### d refers to length-scale parameters, g refers to nugget 
+    
       d <- darg(list(mle=TRUE), X)
       g <- garg(list(mle=ifelse(nugget_known, FALSE, TRUE)), Z) # mle=FALSE: no estimation for nugget term, set to starting value
       
@@ -97,7 +98,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
       if (nugget_known) {
         mle <- mleGPsep(model, param="d", tmin=sqrt(.Machine$double.eps), tmax=d$max, verb = 0) 
       } else {
-        if (pred_type != "original") { # param = "both" doesn't work with pred_type == "original", maybe due to large range of values within variables
+        if (pred_type != "original") { # param = "both" doesn't work with pred_type == "original", maybe due to different scales of predictor values
           mle <- mleGPsep(model, param="both", tmin=c(sqrt(.Machine$double.eps), g$min), tmax = c(d$max, 5), verb = 0)
         } else {
           
@@ -114,7 +115,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
             # mle <- mleGPsep(model, param = "g", tmin=g$min, tmax=5, verb = 0)
         }
       g_used <- ifelse(pred_type == "original", mle$g, mle$theta[ncol(training_set)]) # if jmleGPsep used
-      #g_used <- ifelse(pred_type == "original", mle$mle[length(mle$mle)-2], mle$theta[ncol(training_set)]) # if jmleGPsep.R used
+      # g_used <- ifelse(pred_type == "original", mle$mle[length(mle$mle)-2], mle$theta[ncol(training_set)]) # if jmleGPsep.R used
       }
       # print(d) # for checking how did the estimation work out, use with verb = 1 to see the estimated values
                  # sometimes it happens that the estimated values just end up at max$d, or stays at the starting value, which is suspicious
@@ -179,26 +180,8 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
   
 ##### calculate the metrics #####
   
-  if (sum(is.nan(test_set$se)) > 0) { # there might be NaNs when using nugget too close to zero
-                                      # (variances went negative, don't know the exact reason)
-                                      # this nas variable was used to notice these problematic cases
-    nas <- TRUE
-  } else {
-    nas <- FALSE
-  }
-  
   rmse <- sqrt(mean((test_set$likelihood - test_set$pred)^2, na.rm = TRUE)) 
   mstde <- mean((test_set$se), na.rm = TRUE)
-  
-  if (verb == 1) {
-    metrics <- list("mod_time" = as.numeric(time_model), "pred_time" = as.numeric(time_pred), "rmse" = as.numeric(rmse),
-                 "mstde" = as.numeric(mstde), "observed" = test_set$likelihood, "pred" = test_set$pred, "pred_se" = test_set$se, "Nan_SEs" = nas,
-                 "est_nug" = ifelse(package %in% c("laGP", "hetGP") & nugget_known == "FALSE", g_used, 0))
-    
-  } else {
-    metrics <- c("mod_time" = as.numeric(time_model), "pred_time" = as.numeric(time_pred), "rmse" = as.numeric(rmse),
-                 "mstde" = as.numeric(mstde))
-  }
   
   plot(test_set$pred, test_set$likelihood, xlab = "predicted", ylab = "observed",
        main = paste0("package: ",package,", knots: ",n_knots,", predictors: ",ncol(X),", type: ", pred_type),
@@ -208,6 +191,16 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
   if (diagnostics == TRUE) {
     PIT_histogram(test_set$likelihood, test_set$pred, test_set$se) # function from helpers.R
     dharma_figures(test_set$likelihood, test_set$pred, test_set$se) # function from helpers.R
+  }
+  
+  if (verb == 1) {
+    metrics <- list("mod_time" = as.numeric(time_model), "pred_time" = as.numeric(time_pred), "rmse" = as.numeric(rmse),
+                 "mstde" = as.numeric(mstde), "observed" = test_set$likelihood, "pred" = test_set$pred, "pred_se" = test_set$se,
+                 "est_nug" = ifelse(package %in% c("laGP", "hetGP") & nugget_known == "FALSE", g_used, 0))
+    
+  } else {
+    metrics <- c("mod_time" = as.numeric(time_model), "pred_time" = as.numeric(time_pred), "rmse" = as.numeric(rmse),
+                 "mstde" = as.numeric(mstde))
   }
   
   return(metrics)

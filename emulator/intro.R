@@ -36,7 +36,7 @@ output$est_nug # 0.01437
 
 df_experiments <- data.frame(site_no = NA, response = NA, package = NA, pred_type = NA, no_knots = NA,
                              RMSqE = NA, MStdE = NA, time = NA, no_params = NA, obs = NA)
-df_experiments <- df_experiments[-1, ] # delete the first row for just empty data frame with column names
+(df_experiments <- df_experiments[-1, ]) # delete the first row for just empty data frame with column names
 
 df_experiments <- run_experiments(n_iter = 3, matrix_to_save = df_experiments, knots_list = c(100,200,300,400,500,600),
                                   packages_list = c("hetGP", "laGP", "mgcv"), no_params_list = c(5),
@@ -55,4 +55,4 @@ head(df_experiments, 10)
 compare_packages_plot(matrix = df_experiments, pred = "normal", metric = "RMSqE", n_obs = 10000, n_params = 5)
 compare_param_spaces_plot(matrix = df_experiments, n_obs = 10000)
 
-### other plots too?? explain!!!
+### other plots too?? explain!!!¨

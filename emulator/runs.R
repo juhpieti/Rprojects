@@ -1,12 +1,13 @@
 source("model_metrics.R")
 
 ### Run this script in terminal with: "Rscript ~/path/runs.R"
-### to produce experimentations and save them into a predefined matrix.
+### to produce experiments and save them into a predefined matrix
+### it will also print out the time spent to run the experiments
 
 ### of course the function run_experiments() can be called in Rstudio to produce experiments into a matrix too (see intro.R)
 
 ### HOW TO MODIFY THIS SCRIPT BEFORE RUNNING:
-  # 1) load in the matrix / Rdata you want to save your experimentations in
+  # 1) load in the matrix / Rdata you want to save your experiments in
   # 2) in the end when you call the function, modify the parameters based on what kind of experiments you want to have
   #    (see function inputs described below)
   # 3) remember to save the matrix with added experiments into a Rdata-file in the end too
@@ -22,8 +23,15 @@ source("model_metrics.R")
 ### preds_list: list of parameter spaces you want to experiment with, e.g. preds_list = c("original", "quantile")
 
 
+### NOTICEABLE! ###
+### this function takes in matrix, runs experiments and adds them to that matrix given as input
+### it will then RETURN that modified matrix, so basicly:
+### updated_matrix <- run_experiments(n_iter, matrix_before, ...) will just update matrix_before with new experiments and
+### save it to updated_matrix
+
+
 ### load in the matrix you want to save your experimentations
-load("experiments1.Rdata") 
+load("experiments.Rdata") 
 
 run_experiments <- function(n_iter, matrix_to_save, knots_list, packages_list, no_params_list, preds_list) {
   
@@ -63,12 +71,11 @@ run_experiments <- function(n_iter, matrix_to_save, knots_list, packages_list, n
   print((toc-tic)[[3]])
   
   return(matrix_to_save)
-  
 }
 
-### experimentating and saving the experimentations in matrix you loaded at the beginning
-experiments1 <- run_experiments(1,experiments1,c(3000,4000,5000,6000,7000,8000),c("hetGP"),c(20),c("original"))
+### experimenting and saving the experiments in matrix you loaded at the beginning
+experiments <- run_experiments(1,experiments,c(5000,6000,7000,8000),c("hetGP"),c(5,10),c("original"))
 
-### saving the updatet matrix
-save(experiments1, file = "experiments1.Rdata")
+### saving the updated matrix
+save(experiments, file = "experiments.Rdata")
 

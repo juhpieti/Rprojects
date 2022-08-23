@@ -1,8 +1,10 @@
 library(DHARMa)
 
-### takes in design_matrix, shuffles and returns it
+### bunch of functions used to simplify the major script model_metrics.R
+
+### takes in design_matrix, shuffles and RETURNS it
 ### e.g. SS.stack has 12 lists (different sites) of 2 data frames (response 1 and 2) so you have to specify site and response to use
-### can be used to create a common data to use with different settigns / packages to compare performance
+### can be used to create a common data to use with different settings / packages to compare performance
 shuffle_data <- function(design_matrix = SS.stack, site_no = 1, response = 1) {
   ## check whether your data is just 1 resp 1 site or [[]][[]] type (e.g. SS.stack)?
   if (length(design_matrix[[1]][[1]]) > 1) { #SS.stack with 12 sites, 2 responses
@@ -17,7 +19,7 @@ shuffle_data <- function(design_matrix = SS.stack, site_no = 1, response = 1) {
 }
 
 
-### returns shuffled and prepared (modifies parameter space) design_matrix given to use for modeling
+### RETURNS shuffled and prepared (modifies parameter space) design_matrix given to use for modeling
 ### if known_data given (e.g. known_data = shuffle_data(des_mat)), only prepares and skips the shuffling
 prepare_data <- function(design_matrix = SS.stack, pred_type = "original", site_no = 1, response = 1, known_data = NULL) {
   
@@ -56,7 +58,7 @@ prepare_data <- function(design_matrix = SS.stack, pred_type = "original", site_
 }
 
 
-### fits a model shape of y = exp(b*x) + c , and returns it
+### fits a model shape of y = exp(b*x) + c , and RETURNS it
 ### inputs: y and x as vectors
 ### used for e.g. to predict rmse by knots or time
 exp_decay_offset_mod <- function(y,x) {
@@ -70,7 +72,7 @@ exp_decay_offset_mod <- function(y,x) {
 
 
 ### draws a histogram of empirical cdf values of observations y 
-### doesn't return anything
+### doesn't RETURN anything
 ### assumes that your model with means pred_means and sd:s pred_sds is right
 ### based on PIT-theory, these cdf values should be uniformly distributed
 ### therefore noticeable divergence from Uniform(0,1) suggests that your model isn't right
@@ -92,7 +94,7 @@ PIT_histogram <- function(y, pred_means, pred_sds, m = 250) {
 
 
 ### plots plot.DHARMa figures (QQ-plot, residuals vs predictions) with some p-values too
-### doesn't return anything
+### doesn't RETURN anything
 dharma_figures <- function(y, pred_means, pred_sds, m = 250) { 
   
   n <- length(y)
