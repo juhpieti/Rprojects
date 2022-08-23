@@ -2,7 +2,7 @@
 This project includes my scripts working with statistical emulators. I was experimenting with three different packages (hetGP, laGP, mgcv) to find one to replace the current emulator (mlegp) used in PEcAn (https://github.com/PecanProject/pecan).
 
 ### Master function
-The main function to work with is `fit_model()` from 'model_metrics.R'. It is a function that fits you a chosen model in given data and returns metrics of a fit in addition with different diagnostics plots. Its construction is divided into smaller scripts e.g. `helpers.R` or `autobuild_mgcv.R`.
+The main function to work with is `fit_model()` from `model_metrics.R`. It is a function that fits you a chosen model in given data and returns metrics of a fit in addition with different diagnostics plots. Its construction is divided into smaller scripts e.g. `helpers.R` or `autobuild_mgcv.R`.
 
 ### Other scripts in the project
 In addition to `model_metrics.R` the project includes the following R.scripts:
