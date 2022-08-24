@@ -40,7 +40,7 @@ load("data/prior.ind.all_20.Rdata")
 ###   design_matrix: the design matrix to use to fit the model (e.g. SS.stack, des_mat, des_mat_40_10k)
 ###   known_data: as default, this function shuffles the design_matrix before choosing training points and test points
 ###               known_data can be given to use exactly same training / test sets for e.g. different runs with different settings
-###   diagnostics: if TRUE, plots histogram of empirical cdf values of observations and DHARMa plots (QQ, DHARMa residuals vs predictions)
+###   diagnostics: if TRUE, plots histogram of empirical cdf values of observations and DHARMa plots (QQ, DHARMa residuals vs predicted)
 ###   verb: 0 (default) for less and 1 for more outputs
 
 
@@ -117,6 +117,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
       g_used <- ifelse(pred_type == "original", mle$g, mle$theta[ncol(training_set)]) # if jmleGPsep used
       # g_used <- ifelse(pred_type == "original", mle$mle[length(mle$mle)-2], mle$theta[ncol(training_set)]) # if jmleGPsep.R used
       }
+      
       # print(d) # for checking how did the estimation work out, use with verb = 1 to see the estimated values
                  # sometimes it happens that the estimated values just end up at max$d, or stays at the starting value, which is suspicious
        
@@ -135,7 +136,6 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
   } else if (package == "mgcv") {
     
     model <- build_mgcv(training_set, "likelihood", bs = "cr", type = "bam", n_interactions = gam_interact) # function from autobuild_mgcv.R
-    
   }
   
   toc <- proc.time()
@@ -161,6 +161,7 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
   toc <- proc.time()
   time_pred <- as.numeric((toc - tic)[3])
   
+  ### adding predictions and predictive standard errors to test_set data.frame
   if (package %in% c("mlegp", "mgcv")) {
     test_set <- cbind(test_set, mod_pred$fit, mod_pred$se.fit)
     colnames(test_set)[(ncol(test_set) - 1):ncol(test_set)] <- c("pred", "se")
@@ -183,11 +184,14 @@ fit_model <- function(site_no = 1, response = 1, n_knots = 100, package = "mlegp
   rmse <- sqrt(mean((test_set$likelihood - test_set$pred)^2, na.rm = TRUE)) 
   mstde <- mean((test_set$se), na.rm = TRUE)
   
+##### diagnostic plots #####
+  ### observed vs predicted
   plot(test_set$pred, test_set$likelihood, xlab = "predicted", ylab = "observed",
        main = paste0("package: ",package,", knots: ",n_knots,", predictors: ",ncol(X),", type: ", pred_type),
        sub = paste0("data: ",nrow(df)," observations of response ", response, " from site ",site_no))
   abline(0, 1)
   
+  ### PIT-histograms and couple of DHARMa plots (QQ-plot, DHARMa residuals vs predicted)
   if (diagnostics == TRUE) {
     PIT_histogram(test_set$likelihood, test_set$pred, test_set$se) # function from helpers.R
     dharma_figures(test_set$likelihood, test_set$pred, test_set$se) # function from helpers.R
